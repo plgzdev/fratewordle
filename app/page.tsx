@@ -12,7 +12,7 @@ export default function HomePage() {
 		<Suspense
 			fallback={
 				<div className="min-h-dvh bg-zinc-950 flex items-center justify-center text-zinc-500 text-sm">
-					Cargando FrateWordSquad...
+					Cargando FrateWordleSquad...
 				</div>
 			}
 		>

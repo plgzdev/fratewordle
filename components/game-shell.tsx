@@ -297,7 +297,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 			{/* Header compacto */}
 			<header className="border-b border-zinc-900 px-4 py-3 flex items-center justify-between max-w-lg w-full mx-auto">
 				<div>
-					<h1 className="font-extrabold text-base tracking-tight">FrateWordSquad</h1>
+					<h1 className="font-extrabold text-base tracking-tight">FrateWordleSquad</h1>
 					{data.user ? (
 						<div className="flex items-center gap-2 text-xs text-zinc-400">
 							<span>{data.user.name}</span>
@@ -367,7 +367,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 			<Dialog open={authOpen} onOpenChange={setAuthOpen}>
 				<DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-100 max-w-sm p-0 overflow-hidden">
 					<DialogHeader className="sr-only">
-						<DialogTitle>Iniciar sesión en FrateWordSquad</DialogTitle>
+						<DialogTitle>Iniciar sesión en FrateWordleSquad</DialogTitle>
 					</DialogHeader>
 					<AuthScreen
 						onSuccess={async () => {
