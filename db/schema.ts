@@ -50,9 +50,13 @@ export const verification = pgTable('verification', {
 
 export const dailyWords = pgTable('daily_words', {
 	id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-	dateStr: text('date_str').notNull().unique(),
-	word: text('word').notNull()
-});
+	dateStr: text('date_str').notNull(),
+	mode: text('mode').$type<'word' | 'phrase'>().default('word').notNull(),
+	word: text('word').notNull(),
+	hint: text('hint')
+}, (table) => [
+	uniqueIndex('daily_words_date_mode_unique').on(table.dateStr, table.mode)
+]);
 
 export const gameAttempts = pgTable('game_attempts', {
 	id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
