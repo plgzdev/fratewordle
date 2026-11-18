@@ -1,0 +1,280 @@
+'use server';
+
+import { auth } from '@/lib/auth';
+import { headers } from 'next/headers';
+import { db } from '@/db';
+import { dailyWords, gameAttempts, user } from '@/db/schema';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { getLocalTodayStr, isValidSpanishWord, normalizeSpanish } from '@/lib/dictionary';
+import type { LetterState } from '@/lib/share';
+
+const MAX_ATTEMPTS = 6;
+const LETTER_REGEX = /^[A-ZÑ]$/;
+
+export function evaluateWordGuess(guess: string, target: string): LetterState[] {
+	const len = target.length;
+	const result: LetterState[] = Array(len).fill('absent');
+	const targetChars = target.split('');
+	const guessChars = guess.split('');
+	const used = Array(len).fill(false);
+
+	for (let i = 0; i < len; i++) {
+		if (guessChars[i] === targetChars[i]) {
+			result[i] = 'correct';
+			used[i] = true;
+		}
+	}
+
+	for (let i = 0; i < len; i++) {
+		if (result[i] === 'correct') continue;
+		const idx = targetChars.findIndex((c, j) => !used[j] && c === guessChars[i]);
+		if (idx !== -1) {
+			result[i] = 'present';
+			used[idx] = true;
+		}
+	}
+
+	return result;
+}
+
+function buildMaskedPhrase(target: string, guessedLetters: string[], revealAll: boolean): string[] {
+	const guessedSet = new Set(guessedLetters);
+	return target.split('').map((char) => {
+		if (!LETTER_REGEX.test(char)) return char;
+		if (revealAll || guessedSet.has(char)) return char;
+		return '_';
+	});
+}
+
+export async function getInitialGameData() {
+	const session = await auth.api.getSession({ headers: await headers() });
+	if (!session) return null;
+
+	const today = getLocalTodayStr();
+	const todaysChallenges = await db
+		.select()
+		.from(dailyWords)
+		.where(eq(dailyWords.dateStr, today));
+
+	const wordDaily = todaysChallenges.find((c) => c.mode === 'word') ?? null;
+	const phraseDaily = todaysChallenges.find((c) => c.mode === 'phrase') ?? null;
+
+	const userAttempts = await db
+		.select()
+		.from(gameAttempts)
+		.where(eq(gameAttempts.userId, session.user.id));
+
+	let wordState = null;
+	if (wordDaily) {
+		const target = normalizeSpanish(wordDaily.word);
+		const attempt = userAttempts.find((a) => a.wordId === wordDaily.id);
+		const guesses = attempt?.guesses ?? [];
+		const status = attempt?.status ?? 'playing';
+
+		wordState = {
+			id: wordDaily.id,
+			length: target.length,
+			hint: wordDaily.hint,
+			guesses,
+			evaluations: guesses.map((g) => evaluateWordGuess(g, target)),
+			status,
+			score: attempt?.score ?? 0,
+			solution: status !== 'playing' ? target : null
+		};
+	}
+
+	let phraseState = null;
+	if (phraseDaily) {
+		const target = normalizeSpanish(phraseDaily.word);
+		const attempt = userAttempts.find((a) => a.wordId === phraseDaily.id);
+		const guessedLetters = attempt?.guesses ?? [];
+		const status = attempt?.status ?? 'playing';
+		const wrongLetters = guessedLetters.filter((l) => !target.includes(l));
+
+		phraseState = {
+			id: phraseDaily.id,
+			hint: phraseDaily.hint,
+			maskedChars: buildMaskedPhrase(target, guessedLetters, status !== 'playing'),
+			guessedLetters,
+			wrongLetters,
+			status,
+			score: attempt?.score ?? 0,
+			solution: status !== 'playing' ? target : null
+		};
+	}
+
+	const leaderboard = await db
+		.select({
+			id: user.id,
+			name: user.name,
+			email: user.email,
+			currentStreak: user.currentStreak,
+			maxStreak: user.maxStreak,
+			totalPoints: sql<number>`coalesce(sum(${gameAttempts.score}), 0)`.mapWith(Number),
+			gamesWon: sql<number>`count(case when ${gameAttempts.status} = 'won' then 1 end)`.mapWith(Number),
+			totalSeconds: sql<number>`coalesce(sum(extract(epoch from (${gameAttempts.finishedAt} - ${gameAttempts.startedAt}))), 999999)`.mapWith(Number)
+		})
+		.from(user)
+		.leftJoin(gameAttempts, eq(user.id, gameAttempts.userId))
+		.groupBy(user.id)
+		.orderBy(desc(sql`total_points`), asc(sql`total_seconds`));
+
+	return {
+		user: session.user,
+		wordState,
+		phraseState,
+		leaderboard
+	};
+}
+
+export async function submitWordGuess(guessRaw: string) {
+	const session = await auth.api.getSession({ headers: await headers() });
+	if (!session) return { error: 'UNAUTHENTICATED' as const };
+
+	const today = getLocalTodayStr();
+	const [daily] = await db
+		.select()
+		.from(dailyWords)
+		.where(and(eq(dailyWords.dateStr, today), eq(dailyWords.mode, 'word')));
+
+	if (!daily) return { error: 'NO_WORD_TODAY' as const };
+
+	const target = normalizeSpanish(daily.word);
+	const guess = normalizeSpanish(guessRaw);
+
+	if (guess.length !== target.length) return { error: 'INVALID_LENGTH' as const };
+	if (guess !== target && !isValidSpanishWord(guess, target.length)) {
+		return { error: 'NOT_IN_DICTIONARY' as const };
+	}
+
+	let [attempt] = await db
+		.select()
+		.from(gameAttempts)
+		.where(and(eq(gameAttempts.userId, session.user.id), eq(gameAttempts.wordId, daily.id)));
+
+	if (!attempt) {
+		[attempt] = await db
+			.insert(gameAttempts)
+			.values({ userId: session.user.id, wordId: daily.id, guesses: [] })
+			.returning();
+	}
+
+	if (attempt.status !== 'playing') return { error: 'ALREADY_FINISHED' as const };
+
+	const updatedGuesses = [...attempt.guesses, guess];
+	const evaluation = evaluateWordGuess(guess, target);
+	const won = guess === target;
+	const lost = !won && updatedGuesses.length >= MAX_ATTEMPTS;
+	const status = won ? 'won' : lost ? 'lost' : 'playing';
+
+	const pointsTable: Record<number, number> = { 1: 100, 2: 85, 3: 70, 4: 55, 5: 40, 6: 25 };
+	const score = won ? (pointsTable[updatedGuesses.length] ?? 0) : 0;
+
+	await db
+		.update(gameAttempts)
+		.set({
+			guesses: updatedGuesses,
+			status,
+			score,
+			finishedAt: status !== 'playing' ? new Date() : null
+		})
+		.where(eq(gameAttempts.id, attempt.id));
+
+	if (won) {
+		await db
+			.update(user)
+			.set({
+				currentStreak: sql`${user.currentStreak} + 1`,
+				maxStreak: sql`GREATEST(${user.maxStreak}, ${user.currentStreak} + 1)`
+			})
+			.where(eq(user.id, session.user.id));
+	} else if (lost) {
+		await db.update(user).set({ currentStreak: 0 }).where(eq(user.id, session.user.id));
+	}
+
+	return {
+		ok: true as const,
+		evaluation,
+		status,
+		score,
+		solution: status !== 'playing' ? target : null
+	};
+}
+
+export async function submitPhraseLetter(letterRaw: string) {
+	const session = await auth.api.getSession({ headers: await headers() });
+	if (!session) return { error: 'UNAUTHENTICATED' as const };
+
+	const letter = normalizeSpanish(letterRaw);
+	if (!LETTER_REGEX.test(letter)) return { error: 'INVALID_LETTER' as const };
+
+	const today = getLocalTodayStr();
+	const [daily] = await db
+		.select()
+		.from(dailyWords)
+		.where(and(eq(dailyWords.dateStr, today), eq(dailyWords.mode, 'phrase')));
+
+	if (!daily) return { error: 'NO_PHRASE_TODAY' as const };
+
+	const target = normalizeSpanish(daily.word);
+
+	let [attempt] = await db
+		.select()
+		.from(gameAttempts)
+		.where(and(eq(gameAttempts.userId, session.user.id), eq(gameAttempts.wordId, daily.id)));
+
+	if (!attempt) {
+		[attempt] = await db
+			.insert(gameAttempts)
+			.values({ userId: session.user.id, wordId: daily.id, guesses: [] })
+			.returning();
+	}
+
+	if (attempt.status !== 'playing') return { error: 'ALREADY_FINISHED' as const };
+	if (attempt.guesses.includes(letter)) return { error: 'ALREADY_GUESSED' as const };
+
+	const updatedGuesses = [...attempt.guesses, letter];
+	const wrongLetters = updatedGuesses.filter((l) => !target.includes(l));
+
+	const allLettersFound = target
+		.split('')
+		.filter((c) => LETTER_REGEX.test(c))
+		.every((c) => updatedGuesses.includes(c));
+
+	const won = allLettersFound;
+	const lost = !won && wrongLetters.length >= MAX_ATTEMPTS;
+	const status = won ? 'won' : lost ? 'lost' : 'playing';
+
+	const score = won ? Math.max(25, 100 - wrongLetters.length * 15) : 0;
+
+	await db
+		.update(gameAttempts)
+		.set({
+			guesses: updatedGuesses,
+			status,
+			score,
+			finishedAt: status !== 'playing' ? new Date() : null
+		})
+		.where(eq(gameAttempts.id, attempt.id));
+
+	return {
+		ok: true as const,
+		maskedChars: buildMaskedPhrase(target, updatedGuesses, status !== 'playing'),
+		guessedLetters: updatedGuesses,
+		wrongLetters,
+		status,
+		score,
+		solution: status !== 'playing' ? target : null
+	};
+}
+
+export async function updateDisplayName(newName: string) {
+	const session = await auth.api.getSession({ headers: await headers() });
+	if (!session) return { error: 'UNAUTHENTICATED' as const };
+
+	const cleaned = newName.trim().slice(0, 24);
+	if (cleaned.length < 2) return { error: 'NAME_TOO_SHORT' as const };
+
+	await db.update(user).set({ name: cleaned }).where(eq(user.id, session.user.id));
+	return { ok: true as const };
+}
