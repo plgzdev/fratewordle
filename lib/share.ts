@@ -19,7 +19,7 @@ export function buildWordShareText(params: {
 		.join('\n');
 
 	return [
-		`Frate Wordle #${dayNumber} ${attemptsText} (${score} pts)`,
+		`FrateWordleSquad #${dayNumber} ${attemptsText} (${score} pts)`,
 		'',
 		grid,
 		'',

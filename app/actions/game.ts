@@ -7,11 +7,12 @@ import { dailyWords, gameAttempts, user } from '@/db/schema';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { getLocalTodayStr, isValidSpanishWord, normalizeSpanish } from '@/lib/dictionary';
 import type { LetterState } from '@/lib/share';
+import { connection } from 'next/server';
 
 const MAX_ATTEMPTS = 6;
 const LETTER_REGEX = /^[A-ZÑ]$/;
 
-export function evaluateWordGuess(guess: string, target: string): LetterState[] {
+function evaluateWordGuess(guess: string, target: string): LetterState[] {
 	const len = target.length;
 	const result: LetterState[] = Array(len).fill('absent');
 	const targetChars = target.split('');
@@ -46,11 +47,16 @@ function buildMaskedPhrase(target: string, guessedLetters: string[], revealAll: 
 	});
 }
 
-export async function getInitialGameData() {
-	const session = await auth.api.getSession({ headers: await headers() });
-	if (!session) return null;
+function sanitizeDisplayName(name: string): string {
+	// Si Better Auth puso el correo como nombre por defecto, ocultamos el @dominio
+	return name.includes('@') ? name.split('@')[0] : name;
+}
 
+export async function getInitialGameData() {
+	await connection();
+	const session = await auth.api.getSession({ headers: await headers() });
 	const today = getLocalTodayStr();
+
 	const todaysChallenges = await db
 		.select()
 		.from(dailyWords)
@@ -59,11 +65,11 @@ export async function getInitialGameData() {
 	const wordDaily = todaysChallenges.find((c) => c.mode === 'word') ?? null;
 	const phraseDaily = todaysChallenges.find((c) => c.mode === 'phrase') ?? null;
 
-	const userAttempts = await db
-		.select()
-		.from(gameAttempts)
-		.where(eq(gameAttempts.userId, session.user.id));
+	const userAttempts = session
+		? await db.select().from(gameAttempts).where(eq(gameAttempts.userId, session.user.id))
+		: [];
 
+	// Estado Modo Palabra
 	let wordState = null;
 	if (wordDaily) {
 		const target = normalizeSpanish(wordDaily.word);
@@ -73,6 +79,7 @@ export async function getInitialGameData() {
 
 		wordState = {
 			id: wordDaily.id,
+			dateStr: today,
 			length: target.length,
 			hint: wordDaily.hint,
 			guesses,
@@ -83,6 +90,7 @@ export async function getInitialGameData() {
 		};
 	}
 
+	// Estado Modo Frase (Ahorcado)
 	let phraseState = null;
 	if (phraseDaily) {
 		const target = normalizeSpanish(phraseDaily.word);
@@ -93,6 +101,7 @@ export async function getInitialGameData() {
 
 		phraseState = {
 			id: phraseDaily.id,
+			dateStr: today,
 			hint: phraseDaily.hint,
 			maskedChars: buildMaskedPhrase(target, guessedLetters, status !== 'playing'),
 			guessedLetters,
@@ -103,35 +112,49 @@ export async function getInitialGameData() {
 		};
 	}
 
-	const leaderboard = await db
+	// Ranking sin correos electrónicos, solo apodos
+	const totalPointsExpr = sql<number>`coalesce(sum(${gameAttempts.score}), 0)`.mapWith(Number);
+	const totalSecondsExpr =
+		sql<number>`coalesce(sum(extract(epoch from (${gameAttempts.finishedAt} - ${gameAttempts.startedAt}))), 999999)`.mapWith(
+			Number
+		);
+
+	const rawLeaderboard = await db
 		.select({
 			id: user.id,
 			name: user.name,
-			email: user.email,
 			currentStreak: user.currentStreak,
 			maxStreak: user.maxStreak,
-			totalPoints: sql<number>`coalesce(sum(${gameAttempts.score}), 0)`.mapWith(Number),
+			totalPoints: totalPointsExpr,
 			gamesWon: sql<number>`count(case when ${gameAttempts.status} = 'won' then 1 end)`.mapWith(Number),
-			totalSeconds: sql<number>`coalesce(sum(extract(epoch from (${gameAttempts.finishedAt} - ${gameAttempts.startedAt}))), 999999)`.mapWith(Number)
+			totalSeconds: totalSecondsExpr
 		})
 		.from(user)
 		.leftJoin(gameAttempts, eq(user.id, gameAttempts.userId))
 		.groupBy(user.id)
-		.orderBy(desc(sql`total_points`), asc(sql`total_seconds`));
+		.orderBy(desc(totalPointsExpr), asc(totalSecondsExpr));
+	const leaderboard = rawLeaderboard.map((row) => ({
+		...row,
+		name: sanitizeDisplayName(row.name)
+	}));
 
 	return {
-		user: session.user,
+		user: session
+			? {
+					id: session.user.id,
+					name: sanitizeDisplayName(session.user.name)
+				}
+			: null,
 		wordState,
 		phraseState,
 		leaderboard
 	};
 }
 
-export async function submitWordGuess(guessRaw: string) {
+export async function submitWordGuess(guessRaw: string, guestGuesses: string[] = []) {
 	const session = await auth.api.getSession({ headers: await headers() });
-	if (!session) return { error: 'UNAUTHENTICATED' as const };
-
 	const today = getLocalTodayStr();
+
 	const [daily] = await db
 		.select()
 		.from(dailyWords)
@@ -147,6 +170,28 @@ export async function submitWordGuess(guessRaw: string) {
 		return { error: 'NOT_IN_DICTIONARY' as const };
 	}
 
+	// Flujo INVITADO (sin sesión)
+	if (!session) {
+		if (guestGuesses.length >= MAX_ATTEMPTS) return { error: 'ALREADY_FINISHED' as const };
+		const updatedGuesses = [...guestGuesses, guess];
+		const evaluation = evaluateWordGuess(guess, target);
+		const won = guess === target;
+		const lost = !won && updatedGuesses.length >= MAX_ATTEMPTS;
+		const status = won ? 'won' : lost ? 'lost' : 'playing';
+		const pointsTable: Record<number, number> = { 1: 100, 2: 85, 3: 70, 4: 55, 5: 40, 6: 25 };
+		const score = won ? (pointsTable[updatedGuesses.length] ?? 0) : 0;
+
+		return {
+			ok: true as const,
+			guess,
+			evaluation,
+			status,
+			score,
+			solution: status !== 'playing' ? target : null
+		};
+	}
+
+	// Flujo REGISTRADO (guarda en Supabase)
 	let [attempt] = await db
 		.select()
 		.from(gameAttempts)
@@ -194,6 +239,7 @@ export async function submitWordGuess(guessRaw: string) {
 
 	return {
 		ok: true as const,
+		guess,
 		evaluation,
 		status,
 		score,
@@ -201,10 +247,8 @@ export async function submitWordGuess(guessRaw: string) {
 	};
 }
 
-export async function submitPhraseLetter(letterRaw: string) {
+export async function submitPhraseLetter(letterRaw: string, guestLetters: string[] = []) {
 	const session = await auth.api.getSession({ headers: await headers() });
-	if (!session) return { error: 'UNAUTHENTICATED' as const };
-
 	const letter = normalizeSpanish(letterRaw);
 	if (!LETTER_REGEX.test(letter)) return { error: 'INVALID_LETTER' as const };
 
@@ -218,6 +262,33 @@ export async function submitPhraseLetter(letterRaw: string) {
 
 	const target = normalizeSpanish(daily.word);
 
+	// Flujo INVITADO (sin sesión)
+	if (!session) {
+		if (guestLetters.includes(letter)) return { error: 'ALREADY_GUESSED' as const };
+		const updatedGuesses = [...guestLetters, letter];
+		const wrongLetters = updatedGuesses.filter((l) => !target.includes(l));
+		const allLettersFound = target
+			.split('')
+			.filter((c) => LETTER_REGEX.test(c))
+			.every((c) => updatedGuesses.includes(c));
+
+		const won = allLettersFound;
+		const lost = !won && wrongLetters.length >= MAX_ATTEMPTS;
+		const status = won ? 'won' : lost ? 'lost' : 'playing';
+		const score = won ? Math.max(25, 100 - wrongLetters.length * 15) : 0;
+
+		return {
+			ok: true as const,
+			maskedChars: buildMaskedPhrase(target, updatedGuesses, status !== 'playing'),
+			guessedLetters: updatedGuesses,
+			wrongLetters,
+			status,
+			score,
+			solution: status !== 'playing' ? target : null
+		};
+	}
+
+	// Flujo REGISTRADO (guarda en Supabase)
 	let [attempt] = await db
 		.select()
 		.from(gameAttempts)

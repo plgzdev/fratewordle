@@ -1,15 +1,22 @@
+import { Suspense } from 'react';
 import { getInitialGameData } from '@/app/actions/game';
-import { AuthClientWrapper } from '@/components/auth-wrapper';
 import { GameShell } from '@/components/game-shell';
 
-export const dynamic = 'force-dynamic';
-
-export default async function HomePage() {
+async function GameContent() {
 	const data = await getInitialGameData();
-
-	if (!data) {
-		return <AuthClientWrapper />;
-	}
-
 	return <GameShell initialData={data} />;
+}
+
+export default function HomePage() {
+	return (
+		<Suspense
+			fallback={
+				<div className="min-h-dvh bg-zinc-950 flex items-center justify-center text-zinc-500 text-sm">
+					Cargando FrateWordSquad...
+				</div>
+			}
+		>
+			<GameContent />
+		</Suspense>
+	);
 }

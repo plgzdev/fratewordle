@@ -17,12 +17,12 @@ export const auth = betterAuth({
 		emailOTP({
 			async sendVerificationOTP({ email, otp }) {
 				await resend.emails.send({
-					from: 'Frate Wordle Squad <onboarding@resend.dev>',
+					from: 'FrateWordleSquad <onboarding@resend.dev>',
 					to: email,
-					subject: `${otp} es tu código para Frate Wordle Squad`,
+					subject: `${otp} es tu código para FrateWordleSquad`,
 					html: `
 						<div style="font-family: sans-serif; max-width: 400px; margin: 0 auto; padding: 20px;">
-							<h2 style="margin-bottom: 8px;">Frate Wordle Squad</h2>
+							<h2 style="margin-bottom: 8px;">FrateWordleSquad</h2>
 							<p style="color: #52525b;">Ingresa este código de 6 dígitos para entrar y guardar tu puntaje en el ranking:</p>
 							<div style="font-size: 32px; font-weight: bold; letter-spacing: 8px; padding: 16px; background: #18181b; color: #ffffff; text-align: center; border-radius: 8px; margin: 20px 0;">
 								${otp}
