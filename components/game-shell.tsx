@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
 	getInitialGameData,
+	solvePhraseGuess,
 	submitPhraseLetter,
 	submitWordGuess,
 	updateDisplayName
@@ -23,7 +24,7 @@ import {
 	DialogTitle,
 	DialogTrigger
 } from '@/components/ui/dialog';
-import { Flame, LogIn, LogOut, Share2, Trophy, UserPen } from 'lucide-react';
+import { CheckCircle2, Flame, LogIn, LogOut, Share2, Trophy, UserPen } from 'lucide-react';
 
 type InitialData = Awaited<ReturnType<typeof getInitialGameData>>;
 type GameStatus = 'playing' | 'won' | 'lost';
@@ -37,10 +38,12 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 	const [shake, setShake] = useState(false);
 	const [copied, setCopied] = useState(false);
 
-	// Modal de login opcional y edición de apodo
+	// Modal de login opcional, edición de apodo y resolver frase completa
 	const [authOpen, setAuthOpen] = useState(false);
 	const [nameOpen, setNameOpen] = useState(false);
 	const [nameInput, setNameInput] = useState(initialData.user?.name ?? '');
+	const [solveOpen, setSolveOpen] = useState(false);
+	const [solveInput, setSolveInput] = useState('');
 
 	const showToast = useCallback((msg: string) => {
 		setToastMsg(msg);
@@ -196,12 +199,23 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				if (data.user) {
 					await refreshData();
 				} else {
+					// Mantener las vidas perdidas por intentos fallidos de resolver la frase completa
+					const previousWrongResolutions = ps.wrongLetters.filter((l) => l === '✕').length;
+					const combinedWrongLetters = [
+						...res.wrongLetters,
+						...Array(previousWrongResolutions).fill('✕')
+					];
+					const lostByResolutions = res.status === 'playing' && combinedWrongLetters.length >= 6;
+					const finalStatus: GameStatus = lostByResolutions
+						? 'lost'
+						: (res.status as GameStatus);
+
 					const updatedState = {
 						maskedChars: res.maskedChars,
 						guessedLetters: res.guessedLetters,
-						wrongLetters: res.wrongLetters,
-						status: res.status as GameStatus,
-						score: res.score,
+						wrongLetters: combinedWrongLetters,
+						status: finalStatus,
+						score: finalStatus === 'lost' ? 0 : res.score,
 						solution: res.solution
 					};
 					localStorage.setItem(`fws_phrase_${ps.dateStr}`, JSON.stringify(updatedState));
@@ -219,10 +233,53 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 		[data.phraseState, data.user, refreshData, showToast, submitting]
 	);
 
-	// Soporte para teclado físico en PC
+	async function handleSolvePhraseSubmit(e: React.FormEvent) {
+		e.preventDefault();
+		const ps = data.phraseState;
+		if (!ps || ps.status !== 'playing' || submitting || !solveInput.trim()) return;
+
+		setSubmitting(true);
+		const guestWrongResolutions = ps.wrongLetters.filter((l) => l === '✕').length;
+		const res = await solvePhraseGuess(solveInput, ps.guessedLetters, guestWrongResolutions);
+		setSubmitting(false);
+
+		if ('ok' in res && res.ok) {
+			setSolveInput('');
+			setSolveOpen(false);
+
+			if (data.user) {
+				await refreshData();
+			} else {
+				const updatedState = {
+					maskedChars: res.maskedChars,
+					guessedLetters: res.guessedLetters,
+					wrongLetters: res.wrongLetters,
+					status: res.status as GameStatus,
+					score: res.score,
+					solution: res.solution
+				};
+				localStorage.setItem(`fws_phrase_${ps.dateStr}`, JSON.stringify(updatedState));
+				setData((prev) =>
+					prev.phraseState
+						? { ...prev, phraseState: { ...prev.phraseState, ...updatedState } }
+						: prev
+				);
+			}
+
+			if (res.isCorrect) {
+				showToast(`¡Frase resuelta! +${res.score} pts`);
+			} else if (res.status === 'lost') {
+				showToast('Frase incorrecta · Sin vidas hoy');
+			} else {
+				showToast('Frase incorrecta (-1 vida)');
+			}
+		}
+	}
+
+	// Soporte para teclado físico en PC (pausado cuando hay modales abiertos)
 	useEffect(() => {
 		function onKeyDown(e: KeyboardEvent) {
-			if (nameOpen || authOpen || activeTab === 'ranking') return;
+			if (nameOpen || authOpen || solveOpen || activeTab === 'ranking') return;
 			if (e.ctrlKey || e.metaKey || e.altKey) return;
 
 			const k = e.key.toUpperCase();
@@ -238,7 +295,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 
 		window.addEventListener('keydown', onKeyDown);
 		return () => window.removeEventListener('keydown', onKeyDown);
-	}, [activeTab, authOpen, handlePhraseKey, handleWordKey, nameOpen]);
+	}, [activeTab, authOpen, handlePhraseKey, handleWordKey, nameOpen, solveOpen]);
 
 	async function handleShare(mode: 'word' | 'phrase') {
 		const appUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -297,7 +354,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 			{/* Header compacto */}
 			<header className="border-b border-zinc-900 px-4 py-3 flex items-center justify-between max-w-lg w-full mx-auto">
 				<div>
-					<h1 className="font-extrabold text-base tracking-tight">FrateWordleSquad</h1>
+					<h1 className="font-extrabold text-base tracking-tight">FrateWordSquad</h1>
 					{data.user ? (
 						<div className="flex items-center gap-2 text-xs text-zinc-400">
 							<span>{data.user.name}</span>
@@ -367,7 +424,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 			<Dialog open={authOpen} onOpenChange={setAuthOpen}>
 				<DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-100 max-w-sm p-0 overflow-hidden">
 					<DialogHeader className="sr-only">
-						<DialogTitle>Iniciar sesión en FrateWordleSquad</DialogTitle>
+						<DialogTitle>Iniciar sesión en FrateWordSquad</DialogTitle>
 					</DialogHeader>
 					<AuthScreen
 						onSuccess={async () => {
@@ -376,6 +433,30 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 							showToast('¡Sesión iniciada!');
 						}}
 					/>
+				</DialogContent>
+			</Dialog>
+
+			{/* Modal para Resolver Frase Completa (Estilo Ruleta de la Fortuna) */}
+			<Dialog open={solveOpen} onOpenChange={setSolveOpen}>
+				<DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 max-w-sm">
+					<DialogHeader>
+						<DialogTitle>Resolver la frase completa</DialogTitle>
+					</DialogHeader>
+					<form onSubmit={handleSolvePhraseSubmit} className="space-y-3 pt-1">
+						<p className="text-xs text-zinc-400">
+							Si aciertas ahora ganas puntos extra por las letras sin revelar. Si fallas pierdes 1 vida.
+						</p>
+						<Input
+							value={solveInput}
+							onChange={(e) => setSolveInput(e.target.value)}
+							placeholder="Escribe la frase completa..."
+							autoFocus
+							className="bg-zinc-950 border-zinc-800 uppercase"
+						/>
+						<Button type="submit" disabled={submitting} className="w-full font-semibold">
+							{submitting ? 'Comprobando...' : 'Comprobar frase'}
+						</Button>
+					</form>
 				</DialogContent>
 			</Dialog>
 
@@ -468,7 +549,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 					)}
 				</TabsContent>
 
-				{/* TAB 2: FRASE ESTILO AHORCADO */}
+				{/* TAB 2: FRASE ESTILO RULETA DE LA FORTUNA */}
 				<TabsContent value="phrase" className="flex-1 flex flex-col justify-between pt-4 pb-2 gap-4">
 					{!data.phraseState ? (
 						<p className="text-center text-sm text-zinc-500 my-auto">
@@ -476,12 +557,26 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 						</p>
 					) : (
 						<>
-							<div className="my-auto">
+							<div className="my-auto space-y-4">
 								<PhraseBoard
 									maskedChars={data.phraseState.maskedChars}
 									wrongLetters={data.phraseState.wrongLetters}
 									hint={data.phraseState.hint}
 								/>
+
+								{data.phraseState.status === 'playing' && (
+									<div className="flex justify-center px-4">
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => setSolveOpen(true)}
+											className="gap-1.5 border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 text-xs font-semibold"
+										>
+											<CheckCircle2 className="w-3.5 h-3.5" />
+											¿Ya la sabes? Resolver frase
+										</Button>
+									</div>
+								)}
 							</div>
 
 							{data.phraseState.status !== 'playing' ? (

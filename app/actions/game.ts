@@ -281,6 +281,7 @@ export async function submitWordGuess(guessRaw: string, guestGuesses: string[] =
 export async function submitPhraseLetter(letterRaw: string, guestLetters: string[] = []) {
 	const session = await auth.api.getSession({ headers: await headers() });
 	const letter = normalizeSpanish(letterRaw);
+	
 	if (!LETTER_REGEX.test(letter)) return { error: 'INVALID_LETTER' as const };
 
 	const today = getLocalTodayStr();
@@ -336,12 +337,16 @@ export async function submitPhraseLetter(letterRaw: string, guestLetters: string
 	if (attempt.guesses.includes(letter)) return { error: 'ALREADY_GUESSED' as const };
 
 	const updatedGuesses = [...attempt.guesses, letter];
-	const wrongLetters = updatedGuesses.filter((l) => !target.includes(l));
-
+	const letterGuesses = updatedGuesses.filter((g) => !g.startsWith('SOLVE:'));
+	const wrongResolutions = updatedGuesses.filter((g) => g.startsWith('SOLVE:')).length;
+	const wrongLetters = [
+		...letterGuesses.filter((l) => !target.includes(l)),
+		...Array(wrongResolutions).fill('✕')
+	];
 	const allLettersFound = target
 		.split('')
 		.filter((c) => LETTER_REGEX.test(c))
-		.every((c) => updatedGuesses.includes(c));
+		.every((c) => letterGuesses.includes(c));
 
 	const won = allLettersFound;
 	const lost = !won && wrongLetters.length >= MAX_ATTEMPTS;
@@ -359,14 +364,119 @@ export async function submitPhraseLetter(letterRaw: string, guestLetters: string
 		})
 		.where(eq(gameAttempts.id, attempt.id));
 
+		return {
+			ok: true as const,
+			maskedChars: buildMaskedPhrase(target, letterGuesses, status !== 'playing'),
+			guessedLetters: letterGuesses,
+			wrongLetters,
+			status,
+			score,
+			solution: status !== 'playing' ? target : null
+		};
+}
+
+export async function solvePhraseGuess(
+	phraseGuessRaw: string,
+	guestLetters: string[] = [],
+	guestWrongResolutions = 0
+) {
+	const session = await auth.api.getSession({ headers: await headers() });
+	const today = getLocalTodayStr();
+
+	const [daily] = await db
+		.select()
+		.from(dailyWords)
+		.where(and(eq(dailyWords.dateStr, today), eq(dailyWords.mode, 'phrase')));
+
+	if (!daily) return { error: 'NO_PHRASE_TODAY' as const };
+
+	const target = normalizeSpanish(daily.word);
+	// Normalizamos espacios múltiples y acentos para comparar justo la frase
+	const cleanTarget = target.replace(/\s+/g, ' ').trim();
+	const cleanGuess = normalizeSpanish(phraseGuessRaw).replace(/\s+/g, ' ').trim();
+
+	if (!cleanGuess) return { error: 'EMPTY_GUESS' as const };
+
+	const isCorrect = cleanGuess === cleanTarget;
+
+	// Contar cuántas letras únicas faltaban por descubrir (para dar bono por resolver temprano)
+	const uniqueTargetLetters = new Set(cleanTarget.split('').filter((c) => LETTER_REGEX.test(c)));
+
+	// Flujo INVITADO
+	if (!session) {
+		const wrongLetters = guestLetters.filter((l) => !cleanTarget.includes(l));
+		const totalMistakes = wrongLetters.length + guestWrongResolutions + (isCorrect ? 0 : 1);
+
+		const won = isCorrect;
+		const lost = !won && totalMistakes >= MAX_ATTEMPTS;
+		const status = won ? 'won' : lost ? 'lost' : 'playing';
+
+		const revealedCount = [...uniqueTargetLetters].filter((l) => guestLetters.includes(l)).length;
+		const unrevealedBonus = Math.max(0, (uniqueTargetLetters.size - revealedCount) * 5);
+		const score = won ? Math.min(150, Math.max(30, 100 - wrongLetters.length * 15 + unrevealedBonus)) : 0;
+
+		return {
+			ok: true as const,
+			isCorrect,
+			maskedChars: buildMaskedPhrase(cleanTarget, guestLetters, status !== 'playing'),
+			guessedLetters: guestLetters,
+			wrongLetters,
+			wrongResolutions: guestWrongResolutions + (isCorrect ? 0 : 1),
+			status,
+			score,
+			solution: status !== 'playing' ? cleanTarget : null
+		};
+	}
+
+	// Flujo REGISTRADO (guarda en Supabase)
+	let [attempt] = await db
+		.select()
+		.from(gameAttempts)
+		.where(and(eq(gameAttempts.userId, session.user.id), eq(gameAttempts.wordId, daily.id)));
+
+	if (!attempt) {
+		[attempt] = await db
+			.insert(gameAttempts)
+			.values({ userId: session.user.id, wordId: daily.id, guesses: [] })
+			.returning();
+	}
+
+	if (attempt.status !== 'playing') return { error: 'ALREADY_FINISHED' as const };
+
+	const updatedGuesses = isCorrect ? attempt.guesses : [...attempt.guesses, `SOLVE:${cleanGuess}`];
+	const letterGuesses = updatedGuesses.filter((g) => !g.startsWith('SOLVE:'));
+	const wrongLetters = letterGuesses.filter((l) => !cleanTarget.includes(l));
+	const wrongResolutions = updatedGuesses.filter((g) => g.startsWith('SOLVE:')).length;
+	const totalMistakes = wrongLetters.length + wrongResolutions;
+
+	const won = isCorrect;
+	const lost = !won && totalMistakes >= MAX_ATTEMPTS;
+	const status = won ? 'won' : lost ? 'lost' : 'playing';
+
+	const revealedCount = [...uniqueTargetLetters].filter((l) => letterGuesses.includes(l)).length;
+	const unrevealedBonus = Math.max(0, (uniqueTargetLetters.size - revealedCount) * 5);
+	const score = won ? Math.min(150, Math.max(30, 100 - wrongLetters.length * 15 + unrevealedBonus)) : 0;
+
+	await db
+		.update(gameAttempts)
+		.set({
+			guesses: updatedGuesses,
+			status,
+			score,
+			finishedAt: status !== 'playing' ? new Date() : null
+		})
+		.where(eq(gameAttempts.id, attempt.id));
+
 	return {
 		ok: true as const,
-		maskedChars: buildMaskedPhrase(target, updatedGuesses, status !== 'playing'),
-		guessedLetters: updatedGuesses,
+		isCorrect,
+		maskedChars: buildMaskedPhrase(cleanTarget, letterGuesses, status !== 'playing'),
+		guessedLetters: letterGuesses,
 		wrongLetters,
+		wrongResolutions,
 		status,
 		score,
-		solution: status !== 'playing' ? target : null
+		solution: status !== 'playing' ? cleanTarget : null
 	};
 }
 
