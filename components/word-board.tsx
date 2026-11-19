@@ -29,10 +29,10 @@ export function WordBoard({
 }: WordBoardProps) {
 	const maxWidthClass =
 		length >= 9
-			? 'max-w-[440px]'
+			? 'max-w-[320px] sm:max-w-[440px]'
 			: length >= 7
-				? 'max-w-[420px]'
-				: 'max-w-[350px]';
+				? 'max-w-[300px] sm:max-w-[420px]'
+				: 'max-w-[265px] sm:max-w-[350px]';
 
 	const textSizeClass =
 		length >= 9

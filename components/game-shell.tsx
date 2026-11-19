@@ -353,7 +353,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 		? (data.leaderboards.daily.find((p) => p.id === data.user?.id)?.currentStreak ?? 0)
 		: 0;
 	return (
-		<div className="min-h-dvh w-full overflow-x-hidden bg-retro-board text-[#292524] flex flex-col justify-between">
+		<div className="h-dvh w-full overflow-hidden bg-retro-board text-[#292524] flex flex-col">
 			{/* Header cálido estilo tablero clásico */}
 			<header className="border-b-2 border-[#e6d8c3] bg-[#fffdf9]/90 backdrop-blur-md px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2 max-w-lg w-full mx-auto shadow-xs">
 				<div className="flex items-center gap-2 shrink-0 min-w-0">
@@ -515,11 +515,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 			)}
 
 			{/* Contenido principal con pestañas */}
-			<Tabs
-				value={activeTab}
-				onValueChange={(v) => setActiveTab(v as 'word' | 'phrase' | 'ranking')}
-				className="flex-1 flex flex-col justify-between max-w-lg w-full mx-auto"
-			>
+			<Tabs defaultValue="word" className="flex-1 min-h-0 flex flex-col max-w-lg w-full mx-auto">
 				<div className="px-3 sm:px-4 pt-2.5 w-full">
 					<TabsList className="grid grid-cols-3 w-full bg-[#f7eedb] border-2 border-[#e6d8c3] p-1 rounded-2xl h-10 sm:h-11">
 						<TabsTrigger
@@ -544,7 +540,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 					</TabsList>
 				</div>
 				{/* TAB 1: PALABRA DE LONGITUD VARIABLE */}
-				<TabsContent value="word" className="flex-1 flex flex-col justify-center pt-3 pb-6 gap-5">
+				<TabsContent value="word" className="flex-1 min-h-0 flex flex-col justify-center py-2 gap-2.5 sm:gap-5">
 					{!data.wordState ? (
 						<p className="text-center text-sm text-stone-500 my-auto">
 							No hay palabra programada para hoy.
@@ -613,7 +609,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				</TabsContent>
 
 				{/* TAB 2: FRASE ESTILO RULETA DE LA FORTUNA */}
-				<TabsContent value="phrase" className="flex-1 flex flex-col justify-center pt-4 pb-6 gap-6">
+				<TabsContent value="phrase" className="flex-1 min-h-0 flex flex-col justify-center py-2 gap-3 sm:gap-5">
 					{!data.phraseState ? (
 						<p className="text-center text-sm text-stone-500 my-auto">
 							No hay frase programada para hoy.
@@ -684,7 +680,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 
 				{/* TAB 3: RANKING DEL SQUAD */}
 				{/* TAB 3: RANKING DEL SQUAD (DIARIO / SEMANAL / MENSUAL) */}
-				<TabsContent value="ranking" className="flex-1 px-4 py-4 space-y-3 overflow-y-auto">
+				<TabsContent value="ranking" className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 py-3">
 					{!data.user && (
 						<div className="bg-[#fffdf9] border-2 border-b-4 border-[#e6d8c3] rounded-2xl p-4 text-center space-y-2.5 shadow-xs">
 							<p className="text-sm font-black text-[#292524]">
