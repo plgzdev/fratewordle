@@ -134,3 +134,59 @@
 	background-image: radial-gradient(#e5d5bc 1px, transparent 1px);
 	background-size: 20px 20px;
 }
+
+@theme {
+	--animate-tile-flip: tile-flip 0.55s ease-in-out backwards;
+	--animate-tile-pop: tile-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	--animate-board-shake: board-shake 0.38s ease-in-out;
+
+	@keyframes tile-flip {
+    0% {
+      transform: rotateX(0deg);
+      background-color: #fffdf9;
+      border-color: #f59e0b;
+      color: #292524;
+    }
+    49% {
+      transform: rotateX(90deg);
+      background-color: #fffdf9;
+      border-color: #f59e0b;
+      color: #292524;
+    }
+    50% {
+      transform: rotateX(90deg);
+    }
+    100% {
+      transform: rotateX(0deg);
+    }
+  }
+
+	@keyframes tile-pop {
+		0% {
+			transform: scale(0.75);
+			opacity: 0.5;
+		}
+		60% {
+			transform: scale(1.12);
+		}
+		100% {
+			transform: scale(1);
+			opacity: 1;
+		}
+	}
+
+	@keyframes board-shake {
+		0%,
+		100% {
+			transform: translateX(0);
+		}
+		20%,
+		60% {
+			transform: translateX(-6px);
+		}
+		40%,
+		80% {
+			transform: translateX(6px);
+		}
+	}
+}

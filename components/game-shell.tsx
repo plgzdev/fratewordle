@@ -154,22 +154,23 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 					return;
 				}
 
+				const updatedState = {
+					guesses: [...ws.guesses, res.guess],
+					evaluations: [...ws.evaluations, res.evaluation],
+					status: res.status as GameStatus,
+					score: res.score,
+					solution: res.solution
+				};
+
 				setCurrentGuess('');
+				setData((prev) =>
+					prev.wordState ? { ...prev, wordState: { ...prev.wordState, ...updatedState } } : prev
+				);
 
 				if (data.user) {
 					await refreshData();
 				} else {
-					const updatedState = {
-						guesses: [...ws.guesses, res.guess],
-						evaluations: [...ws.evaluations, res.evaluation],
-						status: res.status as GameStatus,
-						score: res.score,
-						solution: res.solution
-					};
 					localStorage.setItem(`fws_word_${ws.dateStr}`, JSON.stringify(updatedState));
-					setData((prev) =>
-						prev.wordState ? { ...prev, wordState: { ...prev.wordState, ...updatedState } } : prev
-					);
 				}
 
 				if (res.status === 'won') showToast(`¡Brutal! +${res.score} pts`);
@@ -196,37 +197,39 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 			setSubmitting(false);
 
 			if ('ok' in res && res.ok) {
-				if (data.user) {
-					await refreshData();
-				} else {
-					const previousWrongResolutions = ps.wrongLetters.filter((l) => l === '✕').length;
-					const combinedWrongLetters = [
-						...res.wrongLetters,
-						...Array(previousWrongResolutions).fill('✕')
-					];
-					const lostByResolutions = res.status === 'playing' && combinedWrongLetters.length >= 6;
-					const finalStatus: GameStatus = lostByResolutions
-						? 'lost'
-						: (res.status as GameStatus);
+				const previousWrongResolutions = ps.wrongLetters.filter((l) => l === '✕').length;
+				const combinedWrongLetters = [
+					...res.wrongLetters,
+					...Array(previousWrongResolutions).fill('✕')
+				];
+				const lostByResolutions = res.status === 'playing' && combinedWrongLetters.length >= 6;
+				const finalStatus: GameStatus = lostByResolutions
+					? 'lost'
+					: (res.status as GameStatus);
 
-					const updatedState = {
-						maskedChars: res.maskedChars,
-						guessedLetters: res.guessedLetters,
-						wrongLetters: combinedWrongLetters,
-						status: finalStatus,
-						score: finalStatus === 'lost' ? 0 : res.score,
-						solution: res.solution
-					};
+				const updatedState = {
+					maskedChars: res.maskedChars,
+					guessedLetters: res.guessedLetters,
+					wrongLetters: combinedWrongLetters,
+					status: finalStatus,
+					score: finalStatus === 'lost' ? 0 : res.score,
+					solution: res.solution
+				};
+
+				setData((prev) =>
+					prev.phraseState
+						? { ...prev, phraseState: { ...prev.phraseState, ...updatedState } }
+						: prev
+				);
+
+				if (data.user) {
+					refreshData();
+				} else {
 					localStorage.setItem(`fws_phrase_${ps.dateStr}`, JSON.stringify(updatedState));
-					setData((prev) =>
-						prev.phraseState
-							? { ...prev, phraseState: { ...prev.phraseState, ...updatedState } }
-							: prev
-					);
 				}
 
-				if (res.status === 'won') showToast(`¡Frase resuelta! +${res.score} pts`);
-				else if (res.status === 'lost') showToast('Sin vidas hoy');
+				if (finalStatus === 'won') showToast(`¡Frase resuelta! +${res.score} pts`);
+				else if (finalStatus === 'lost') showToast('Sin vidas hoy');
 			}
 		},
 		[data.phraseState, data.user, refreshData, showToast, submitting]

@@ -27,7 +27,6 @@ export function WordBoard({
 	isPlaying,
 	shake
 }: WordBoardProps) {
-	// Ajustar tamaño de casilla si la palabra es larga (7, 8 o más letras)
 	const tileSize =
 		length >= 9
 			? 'w-8 h-9 text-base'
@@ -39,6 +38,7 @@ export function WordBoard({
 		<div className="flex flex-col items-center gap-1.5 px-2 select-none">
 			{Array.from({ length: MAX_ROWS }).map((_, rowIndex) => {
 				const isSubmitted = rowIndex < guesses.length;
+				const isLatestSubmitted = rowIndex === guesses.length - 1;
 				const isCurrentRow = isPlaying && rowIndex === guesses.length;
 				const rowWord = isSubmitted
 					? guesses[rowIndex]
@@ -46,35 +46,44 @@ export function WordBoard({
 						? currentGuess.padEnd(length, ' ')
 						: ' '.repeat(length);
 
-				return (
-					<div
-						key={rowIndex}
-						className={`flex gap-1.5 ${isCurrentRow && shake ? 'animate-bounce' : ''}`}
-					>
-						{Array.from({ length }).map((__, colIndex) => {
-							const char = rowWord[colIndex]?.trim() ?? '';
-							const state = isSubmitted ? evaluations[rowIndex]?.[colIndex] : undefined;
-
-							let cellStyle =
-								'bg-[#f7eedb]/80 border-2 border-b-4 border-stone-300/80 text-transparent';
-							if (state) {
-								cellStyle = `border-2 border-b-4 ${STATE_STYLES[state]}`;
-							} else if (char) {
-								cellStyle =
-									'bg-[#fffdf9] border-2 border-b-4 border-amber-500/80 text-[#292524] scale-105 shadow-sm';
-							}
-
-							return (
-								<div
-									key={colIndex}
-									className={`${tileSize} rounded-xl font-black uppercase flex items-center justify-center transition-all duration-150 ${cellStyle}`}
-								>
-									{char}
-								</div>
-							);
-						})}
-					</div>
-				);
+						return (
+							<div
+								key={rowIndex}
+								className={`flex gap-1.5 ${isCurrentRow && shake ? 'animate-board-shake' : ''}`}
+							>
+								{Array.from({ length }).map((__, colIndex) => {
+									const char = rowWord[colIndex]?.trim() ?? '';
+									const state = isSubmitted ? evaluations[rowIndex]?.[colIndex] : undefined;
+						
+									let cellStyle =
+										'bg-[#f7eedb]/80 border-2 border-b-4 border-stone-300/80 text-transparent';
+									if (state) {
+										cellStyle = `border-2 border-b-4 ${STATE_STYLES[state]}`;
+									} else if (char) {
+										cellStyle =
+											'bg-[#fffdf9] border-2 border-b-4 border-amber-500/80 text-[#292524] scale-105 shadow-sm';
+									}
+						
+									return (
+										<div
+											key={colIndex}
+											style={
+												isLatestSubmitted
+													? { animationDelay: `${colIndex * 110}ms` }
+													: undefined
+											}
+											className={`${tileSize} rounded-xl font-black uppercase flex items-center justify-center ${cellStyle} ${
+												isLatestSubmitted
+													? 'animate-tile-flip will-change-transform'
+													: 'transition-transform duration-100'
+											}`}
+										>
+											{char}
+										</div>
+									);
+								})}
+							</div>
+						);
 			})}
 		</div>
 	);

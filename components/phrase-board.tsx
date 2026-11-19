@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
+
 interface PhraseBoardProps {
 	maskedChars: string[];
 	wrongLetters: string[];
@@ -9,7 +11,21 @@ interface PhraseBoardProps {
 const MAX_LIVES = 6;
 
 export function PhraseBoard({ maskedChars, wrongLetters, hint }: PhraseBoardProps) {
-	// Reconstruir palabras individuales para que nunca se parta una palabra a la mitad al saltar de línea
+	const [shakeBoard, setShakeBoard] = useState(false);
+	const prevWrongCountRef = useRef(wrongLetters.length);
+
+	// Activar sacudida cuando aumenta el contador de fallos
+	useEffect(() => {
+		if (wrongLetters.length > prevWrongCountRef.current) {
+			setShakeBoard(true);
+			const timer = setTimeout(() => setShakeBoard(false), 400);
+			prevWrongCountRef.current = wrongLetters.length;
+			return () => clearTimeout(timer);
+		}
+		prevWrongCountRef.current = wrongLetters.length;
+	}, [wrongLetters.length]);
+
+	// Reconstruir palabras individuales para que nunca se parta una palabra a la mitad
 	const words: string[][] = [];
 	let currentWord: string[] = [];
 
@@ -40,10 +56,10 @@ export function PhraseBoard({ maskedChars, wrongLetters, hint }: PhraseBoardProp
 						return (
 							<span
 								key={idx}
-								className={`w-2.5 h-2.5 rounded-full transition-all ${
+								className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
 									active
 										? 'bg-rose-500 shadow-xs shadow-rose-500/40 scale-100'
-										: 'bg-stone-300 scale-90'
+										: 'bg-stone-300 scale-75'
 								}`}
 							/>
 						);
@@ -58,7 +74,11 @@ export function PhraseBoard({ maskedChars, wrongLetters, hint }: PhraseBoardProp
 			</div>
 
 			{/* Tablero de paneles estilo concurso de TV */}
-			<div className="flex flex-wrap justify-center gap-x-4 gap-y-2.5 max-w-md">
+			<div
+				className={`flex flex-wrap justify-center gap-x-4 gap-y-2.5 max-w-md ${
+					shakeBoard ? 'animate-board-shake' : ''
+				}`}
+			>
 				{words.map((wordChars, wIdx) => (
 					<div key={wIdx} className="flex gap-1">
 						{wordChars.map((ch, cIdx) => {
@@ -78,11 +98,14 @@ export function PhraseBoard({ maskedChars, wrongLetters, hint }: PhraseBoardProp
 
 							return (
 								<div
-									key={cIdx}
-									className={`w-7 h-9 sm:w-8 sm:h-10 rounded-lg border-2 border-b-4 font-black text-base sm:text-lg flex items-center justify-center transition-all duration-200 ${
+									key={`${cIdx}-${isHidden ? 'hidden' : ch}`}
+									style={
+										!isHidden ? { animationDelay: `${cIdx * 45}ms` } : undefined
+									}
+									className={`w-7 h-9 sm:w-8 sm:h-10 rounded-lg border-2 border-b-4 font-black text-base sm:text-lg flex items-center justify-center transition-colors duration-200 ${
 										isHidden
 											? 'bg-[#fffdf9] border-stone-300 text-transparent shadow-xs'
-											: 'bg-emerald-500 border-emerald-700 text-white shadow-sm scale-105'
+											: 'bg-emerald-500 border-emerald-700 text-white shadow-sm animate-tile-pop'
 									}`}
 								>
 									{isHidden ? '' : ch}
@@ -100,7 +123,7 @@ export function PhraseBoard({ maskedChars, wrongLetters, hint }: PhraseBoardProp
 					{wrongLetters.map((wl, i) => (
 						<span
 							key={`${wl}-${i}`}
-							className="px-2 py-0.5 text-xs font-extrabold rounded-md bg-rose-100 border border-rose-300 text-rose-700"
+							className="px-2 py-0.5 text-xs font-extrabold rounded-md bg-rose-100 border border-rose-300 text-rose-700 animate-tile-pop"
 						>
 							{wl}
 						</span>
