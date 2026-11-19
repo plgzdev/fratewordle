@@ -32,46 +32,28 @@ export function getLocalTodayStr(): string {
 }
 
 const FALLBACK_WORDS: Array<{ word: string; hint: string }> = [
-	{ word: 'AREPA', hint: '' },
-	{ word: 'TURPIAL', hint: '' },
-	{ word: 'CHIGUIRE', hint: '' },
-	{ word: 'CACHAPA', hint: '' },
-	{ word: 'HALLACA', hint: '' },
-	{ word: 'TEQUENO', hint: '' },
-	{ word: 'PAPELON', hint: '' },
-	{ word: 'MORROCOY', hint: '' },
-	{ word: 'GUACAMAYA', hint: '' },
-	{ word: 'ARAGUANEY', hint: '' },
-	{ word: 'CUATRO', hint: '' },
-	{ word: 'JOROPO', hint: '' },
-	{ word: 'MEDANOS', hint: '' },
-	{ word: 'SALTO', hint: '' },
-	{ word: 'PARQUE', hint: '' },
-	{ word: 'CAMINO', hint: '' },
-	{ word: 'ESTUDIO', hint: '' },
-	{ word: 'VENTANA', hint: '' },
-	{ word: 'ESPEJO', hint: '' },
-	{ word: 'RELOJ', hint: '' },
-	{ word: 'LIBRO', hint: '' },
-	{ word: 'PUENTE', hint: '' },
-	{ word: 'ESTRELLA', hint: '' },
-	{ word: 'MONTAÑA', hint: '' },
-	{ word: 'BOSQUE', hint: '' },
-	{ word: 'PLAYA', hint: '' },
-	{ word: 'VIENTO', hint: '' },
-	{ word: 'TRUENO', hint: '' },
-	{ word: 'SEMILLA', hint: '' },
-	{ word: 'COSECHA', hint: '' }
+	{ word: 'AREPA', hint: 'Comida tradicional' },
+	{ word: 'CACHAPA', hint: 'Comida tradicional' },
+	{ word: 'HALLACA', hint: 'Comida tradicional' },
+	{ word: 'TEQUENO', hint: 'Comida tradicional' },
+	{ word: 'PAPELON', hint: 'Comida tradicional' },
+	{ word: 'TURPIAL', hint: 'Animal' },
+	{ word: 'CHIGUIRE', hint: 'Animal' },
+	{ word: 'MORROCOY', hint: 'Animal' },
+	{ word: 'GUACAMAYA', hint: 'Animal' },
+	{ word: 'ARAGUANEY', hint: 'Planta' },
+	{ word: 'CUATRO', hint: 'Tema músical' },
+	{ word: 'JOROPO', hint: 'Tema músical' },
+	{ word: 'CUBIRO', hint: 'Lugar' },
+	{ word: 'MERIDA', hint: 'Lugar' },
 ];
 
 const FALLBACK_PHRASES: Array<{ word: string; hint: string }> = [
 	{ word: 'CAMARON QUE SE DUERME SE LO LLEVA LA CORRIENTE', hint: 'Refrán popular' },
-	{ word: 'MAS VALE PAJARO EN MANO QUE CIEN VOLANDO', hint: 'Dicho tradicional' },
-	{ word: 'A CABALLO REGALADO NO SE LE MIRA EL COLMILLO', hint: 'Refrán popular' },
-	{ word: 'NO POR MUCHO MADRUGAR AMANECE MAS TEMPRANO', hint: 'Refrán popular' },
-	{ word: 'EN BOCA CERRADA NO ENTRAN MOSCAS', hint: 'Consejo clásico' },
 	{ word: 'AL QUE MADRUGA DIOS LO AYUDA', hint: 'Dicho popular' },
-	{ word: 'QUIEN MUCHO ABARCA POCO APRIETA', hint: 'Refrán popular' }
+	{ word: 'QUIEN MUCHO ABARCA POCO APRIETA', hint: 'Refrán popular' },
+	{ word: 'EN BOCA CERRADA NO ENTRAN MOSCAS', hint: 'Consejo clásico' },
+	{ word: 'NO POR MUCHO MADRUGAR AMANECE MAS TEMPRANO', hint: 'Refrán popular' },
 ];
 
 function hashDateSeed(dateStr: string): number {
