@@ -128,3 +128,9 @@
     @apply font-sans;
   }
 }
+
+.bg-retro-board {
+	background-color: #fdf8ee;
+	background-image: radial-gradient(#e5d5bc 1px, transparent 1px);
+	background-size: 20px 20px;
+}

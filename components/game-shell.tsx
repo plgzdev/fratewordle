@@ -24,7 +24,7 @@ import {
 	DialogTitle,
 	DialogTrigger
 } from '@/components/ui/dialog';
-import { CheckCircle2, Flame, LogIn, LogOut, Share2, Trophy, UserPen } from 'lucide-react';
+import { Flame, LogIn, LogOut, Share2, Sparkles, Trophy, UserPen } from 'lucide-react';
 
 type InitialData = Awaited<ReturnType<typeof getInitialGameData>>;
 type GameStatus = 'playing' | 'won' | 'lost';
@@ -199,7 +199,6 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				if (data.user) {
 					await refreshData();
 				} else {
-					// Mantener las vidas perdidas por intentos fallidos de resolver la frase completa
 					const previousWrongResolutions = ps.wrongLetters.filter((l) => l === '✕').length;
 					const combinedWrongLetters = [
 						...res.wrongLetters,
@@ -276,7 +275,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 		}
 	}
 
-	// Soporte para teclado físico en PC (pausado cuando hay modales abiertos)
+	// Soporte para teclado físico en PC
 	useEffect(() => {
 		function onKeyDown(e: KeyboardEvent) {
 			if (nameOpen || authOpen || solveOpen || activeTab === 'ranking') return;
@@ -350,32 +349,39 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 		: 0;
 
 	return (
-		<div className="min-h-dvh bg-zinc-950 text-zinc-100 flex flex-col justify-between">
-			{/* Header compacto */}
-			<header className="border-b border-zinc-900 px-4 py-3 flex items-center justify-between max-w-lg w-full mx-auto">
-				<div>
-					<h1 className="font-extrabold text-base tracking-tight">FrateWordSquad</h1>
-					{data.user ? (
-						<div className="flex items-center gap-2 text-xs text-zinc-400">
-							<span>{data.user.name}</span>
-							<span className="inline-flex items-center gap-0.5 text-amber-400 font-semibold">
-								<Flame className="w-3.5 h-3.5 fill-amber-400" />
-								{currentUserStreak}
-							</span>
-						</div>
-					) : (
-						<p className="text-xs text-zinc-500">Modo invitado</p>
-					)}
+		<div className="min-h-dvh bg-retro-board text-[#292524] flex flex-col justify-between">
+			{/* Header cálido estilo tablero clásico */}
+			<header className="border-b-2 border-[#e6d8c3] bg-[#fffdf9]/90 backdrop-blur-md px-4 py-3 flex items-center justify-between max-w-lg w-full mx-auto shadow-xs">
+				<div className="flex items-center gap-2.5">
+					<div className="w-9 h-9 rounded-xl bg-emerald-500 border-2 border-b-4 border-emerald-700 text-white font-black text-lg flex items-center justify-center shadow-xs">
+						F
+					</div>
+					<div>
+					<h1 className="font-black text-base tracking-tight text-[#292524]">
+						Frate<span className="text-emerald-600">Wordle</span>Squad
+					</h1>
+						{data.user ? (
+							<div className="flex items-center gap-2 text-xs text-stone-600 font-medium">
+								<span>{data.user.name}</span>
+								<span className="inline-flex items-center gap-0.5 text-orange-600 font-extrabold bg-orange-100 px-1.5 py-0.2 rounded-full">
+									<Flame className="w-3.5 h-3.5 fill-orange-500 text-orange-600" />
+									{currentUserStreak}
+								</span>
+							</div>
+						) : (
+							<p className="text-[11px] text-stone-500 font-medium">Modo invitado</p>
+						)}
+					</div>
 				</div>
 
-				<div className="flex items-center gap-1">
+				<div className="flex items-center gap-1.5">
 					{data.user ? (
 						<>
 							<Dialog open={nameOpen} onOpenChange={setNameOpen}>
-								<DialogTrigger className="inline-flex items-center justify-center h-9 w-9 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">
+								<DialogTrigger className="inline-flex items-center justify-center h-9 w-9 rounded-xl bg-[#f7eedb] border border-stone-300 text-stone-700 hover:bg-amber-100 transition-colors cursor-pointer">
 									<UserPen className="w-4 h-4" />
 								</DialogTrigger>
-								<DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 max-w-xs">
+								<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] max-w-xs">
 									<DialogHeader>
 										<DialogTitle>Tu apodo en el Squad</DialogTitle>
 									</DialogHeader>
@@ -385,9 +391,12 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 											onChange={(e) => setNameInput(e.target.value)}
 											maxLength={24}
 											placeholder="Tu apodo"
-											className="bg-zinc-950 border-zinc-800"
+											className="bg-[#fdf8ee] border-stone-300 text-[#292524]"
 										/>
-										<Button type="submit" className="w-full">
+										<Button
+											type="submit"
+											className="w-full bg-emerald-600 hover:bg-emerald-500 border-b-4 border-emerald-800 text-white font-bold"
+										>
 											Guardar
 										</Button>
 									</form>
@@ -401,30 +410,29 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 									await authClient.signOut();
 									window.location.reload();
 								}}
-								className="text-zinc-400 hover:text-rose-400"
+								className="rounded-xl text-stone-500 hover:text-rose-600 hover:bg-rose-50"
 							>
 								<LogOut className="w-4 h-4" />
 							</Button>
 						</>
 					) : (
-						<Button
-							variant="outline"
-							size="sm"
+						<button
+							type="button"
 							onClick={() => setAuthOpen(true)}
-							className="gap-1.5 border-zinc-800 bg-zinc-900 text-xs"
+							className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#fffdf9] hover:bg-amber-50 border-2 border-b-4 border-stone-300 text-[#292524] text-xs font-extrabold active:translate-y-0.5 transition-all cursor-pointer"
 						>
-							<LogIn className="w-3.5 h-3.5" />
+							<LogIn className="w-3.5 h-3.5 text-emerald-600" />
 							Entrar
-						</Button>
+						</button>
 					)}
 				</div>
 			</header>
 
 			{/* Modal de Login Opcional */}
 			<Dialog open={authOpen} onOpenChange={setAuthOpen}>
-				<DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-100 max-w-sm p-0 overflow-hidden">
+				<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] max-w-sm p-0 overflow-hidden">
 					<DialogHeader className="sr-only">
-						<DialogTitle>Iniciar sesión en FrateWordSquad</DialogTitle>
+						<DialogTitle>Iniciar sesión en FrateWordleSquad</DialogTitle>
 					</DialogHeader>
 					<AuthScreen
 						onSuccess={async () => {
@@ -436,33 +444,40 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				</DialogContent>
 			</Dialog>
 
-			{/* Modal para Resolver Frase Completa (Estilo Ruleta de la Fortuna) */}
+			{/* Modal para Resolver Frase Completa */}
 			<Dialog open={solveOpen} onOpenChange={setSolveOpen}>
-				<DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 max-w-sm">
+				<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] max-w-sm">
 					<DialogHeader>
-						<DialogTitle>Resolver la frase completa</DialogTitle>
+						<DialogTitle className="flex items-center gap-2 text-amber-800 font-black">
+							<Sparkles className="w-5 h-5 text-amber-500 fill-amber-400" />
+							Resolver la frase completa
+						</DialogTitle>
 					</DialogHeader>
 					<form onSubmit={handleSolvePhraseSubmit} className="space-y-3 pt-1">
-						<p className="text-xs text-zinc-400">
-							Si aciertas ahora ganas puntos extra por las letras sin revelar. Si fallas pierdes 1 vida.
+						<p className="text-xs text-stone-600 leading-relaxed">
+							Si aciertas ahora ganas <span className="text-emerald-700 font-bold">puntos extra</span> por las letras sin revelar. Si fallas pierdes 1 vida.
 						</p>
 						<Input
 							value={solveInput}
 							onChange={(e) => setSolveInput(e.target.value)}
 							placeholder="Escribe la frase completa..."
 							autoFocus
-							className="bg-zinc-950 border-zinc-800 uppercase"
+							className="bg-[#fdf8ee] border-2 border-stone-300 focus-visible:ring-amber-400 uppercase font-bold text-[#292524]"
 						/>
-						<Button type="submit" disabled={submitting} className="w-full font-semibold">
+						<button
+							type="submit"
+							disabled={submitting}
+							className="w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 active:translate-y-0.5 border-2 border-b-4 border-amber-600 text-amber-950 font-black text-sm tracking-wide transition-all disabled:opacity-50 cursor-pointer"
+						>
 							{submitting ? 'Comprobando...' : 'Comprobar frase'}
-						</Button>
+						</button>
 					</form>
 				</DialogContent>
 			</Dialog>
 
 			{/* Toast flotante */}
 			{toastMsg && (
-				<div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-zinc-100 text-zinc-950 text-xs font-bold px-4 py-2 rounded-full shadow-lg">
+				<div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-[#292524] text-[#fdf8ee] text-xs font-extrabold px-4 py-2 rounded-full shadow-lg">
 					{toastMsg}
 				</div>
 			)}
@@ -474,30 +489,43 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				className="flex-1 flex flex-col justify-between max-w-lg w-full mx-auto"
 			>
 				<div className="px-4 pt-3">
-					<TabsList className="grid grid-cols-3 w-full bg-zinc-900 border border-zinc-800">
-						<TabsTrigger value="word">Palabra</TabsTrigger>
-						<TabsTrigger value="phrase">Frase</TabsTrigger>
-						<TabsTrigger value="ranking" className="gap-1">
-							<Trophy className="w-3.5 h-3.5" />
-							Ranking
-						</TabsTrigger>
-					</TabsList>
+				<TabsList className="grid grid-cols-3 w-full bg-[#f7eedb] border-2 border-[#e6d8c3] p-1 rounded-2xl h-11">
+					<TabsTrigger
+						value="word"
+						className="rounded-xl font-bold text-stone-600 data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-xs"
+					>
+						Palabra
+					</TabsTrigger>
+					<TabsTrigger
+						value="phrase"
+						className="rounded-xl font-bold text-stone-600 data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-xs"
+					>
+						Frase
+					</TabsTrigger>
+					<TabsTrigger
+						value="ranking"
+						className="gap-1.5 rounded-xl font-bold text-stone-600 data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-xs"
+					>
+						<Trophy className="w-3.5 h-3.5" />
+						Ranking
+					</TabsTrigger>
+				</TabsList>
 				</div>
 
 				{/* TAB 1: PALABRA DE LONGITUD VARIABLE */}
 				<TabsContent value="word" className="flex-1 flex flex-col justify-between pt-3 pb-2 gap-4">
 					{!data.wordState ? (
-						<p className="text-center text-sm text-zinc-500 my-auto">
+						<p className="text-center text-sm text-stone-500 my-auto">
 							No hay palabra programada para hoy.
 						</p>
 					) : (
 						<>
-							<div className="text-center space-y-1 px-4">
-								<p className="text-xs text-zinc-400">
-									Palabra de <span className="font-bold text-zinc-200">{data.wordState.length} letras</span>
+							<div className="text-center space-y-1.5 px-4">
+								<p className="text-xs text-stone-600 font-medium">
+									Palabra de <span className="font-black text-[#292524]">{data.wordState.length} letras</span>
 								</p>
 								{data.wordState.hint && (
-									<span className="inline-block text-xs bg-zinc-900 border border-zinc-800 text-zinc-300 px-3 py-0.5 rounded-full">
+									<span className="inline-block text-xs font-semibold bg-amber-100 border border-amber-300 text-amber-900 px-3 py-0.5 rounded-full shadow-xs">
 										Pista: {data.wordState.hint}
 									</span>
 								)}
@@ -514,28 +542,32 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 
 							{data.wordState.status !== 'playing' ? (
 								<div className="px-4 py-3 text-center space-y-3">
-									<div className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-4 space-y-1">
-										<p className="text-xs text-zinc-400">
+									<div className="bg-[#fffdf9] border-2 border-b-4 border-[#e6d8c3] rounded-2xl p-4 space-y-1 shadow-sm">
+										<p className="text-xs font-bold text-stone-500">
 											{data.wordState.status === 'won' ? '¡Adivinada!' : 'La palabra era:'}
 										</p>
-										<p className="text-xl font-extrabold tracking-widest text-emerald-400">
+										<p className="text-2xl font-black tracking-widest text-emerald-600">
 											{data.wordState.solution}
 										</p>
-										<p className="text-xs text-zinc-400">Puntos hoy: {data.wordState.score}</p>
+										<p className="text-xs font-semibold text-stone-500">Puntos hoy: {data.wordState.score}</p>
 									</div>
 									{!data.user && (
-										<Button
-											variant="outline"
+										<button
+											type="button"
 											onClick={() => setAuthOpen(true)}
-											className="w-full border-emerald-500/40 text-emerald-400 hover:bg-emerald-950/40"
+											className="w-full py-2.5 rounded-xl bg-[#fffdf9] hover:bg-emerald-50 border-2 border-b-4 border-emerald-500 text-emerald-700 font-extrabold text-xs active:translate-y-0.5 transition-all cursor-pointer"
 										>
 											Inicia sesión para entrar al Ranking
-										</Button>
+										</button>
 									)}
-									<Button onClick={() => handleShare('word')} className="w-full gap-2 font-semibold">
+									<button
+										type="button"
+										onClick={() => handleShare('word')}
+										className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 border-2 border-b-4 border-emerald-700 text-white font-black text-sm flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+									>
 										<Share2 className="w-4 h-4" />
 										{copied ? '¡Copiado para WhatsApp!' : 'Compartir resultado'}
-									</Button>
+									</button>
 								</div>
 							) : (
 								<Keyboard
@@ -552,12 +584,12 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				{/* TAB 2: FRASE ESTILO RULETA DE LA FORTUNA */}
 				<TabsContent value="phrase" className="flex-1 flex flex-col justify-between pt-4 pb-2 gap-4">
 					{!data.phraseState ? (
-						<p className="text-center text-sm text-zinc-500 my-auto">
+						<p className="text-center text-sm text-stone-500 my-auto">
 							No hay frase programada para hoy.
 						</p>
 					) : (
 						<>
-							<div className="my-auto space-y-4">
+							<div className="my-auto space-y-5">
 								<PhraseBoard
 									maskedChars={data.phraseState.maskedChars}
 									wrongLetters={data.phraseState.wrongLetters}
@@ -566,43 +598,46 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 
 								{data.phraseState.status === 'playing' && (
 									<div className="flex justify-center px-4">
-										<Button
-											variant="outline"
-											size="sm"
+										<button
+											type="button"
 											onClick={() => setSolveOpen(true)}
-											className="gap-1.5 border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 text-xs font-semibold"
+											className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 active:translate-y-0.5 text-amber-950 font-black text-xs uppercase tracking-wider shadow-md border-2 border-b-4 border-amber-600 transition-all cursor-pointer"
 										>
-											<CheckCircle2 className="w-3.5 h-3.5" />
-											¿Ya la sabes? Resolver frase
-										</Button>
+											<Sparkles className="w-4 h-4 stroke-[2.5] text-amber-900" />
+											Resolver frase completa
+										</button>
 									</div>
 								)}
 							</div>
 
 							{data.phraseState.status !== 'playing' ? (
 								<div className="px-4 py-3 text-center space-y-3">
-									<div className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-4 space-y-1">
-										<p className="text-xs text-zinc-400">
+									<div className="bg-[#fffdf9] border-2 border-b-4 border-[#e6d8c3] rounded-2xl p-4 space-y-1 shadow-sm">
+										<p className="text-xs font-bold text-stone-500">
 											{data.phraseState.status === 'won' ? '¡Frase completada!' : 'La frase era:'}
 										</p>
-										<p className="text-base font-extrabold tracking-wide text-emerald-400">
+										<p className="text-base font-black tracking-wide text-emerald-600">
 											{data.phraseState.solution}
 										</p>
-										<p className="text-xs text-zinc-400">Puntos hoy: {data.phraseState.score}</p>
+										<p className="text-xs font-semibold text-stone-500">Puntos hoy: {data.phraseState.score}</p>
 									</div>
 									{!data.user && (
-										<Button
-											variant="outline"
+										<button
+											type="button"
 											onClick={() => setAuthOpen(true)}
-											className="w-full border-emerald-500/40 text-emerald-400 hover:bg-emerald-950/40"
+											className="w-full py-2.5 rounded-xl bg-[#fffdf9] hover:bg-emerald-50 border-2 border-b-4 border-emerald-500 text-emerald-700 font-extrabold text-xs active:translate-y-0.5 transition-all cursor-pointer"
 										>
 											Inicia sesión para entrar al Ranking
-										</Button>
+										</button>
 									)}
-									<Button onClick={() => handleShare('phrase')} className="w-full gap-2 font-semibold">
+									<button
+										type="button"
+										onClick={() => handleShare('phrase')}
+										className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 border-2 border-b-4 border-emerald-700 text-white font-black text-sm flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+									>
 										<Share2 className="w-4 h-4" />
 										{copied ? '¡Copiado para WhatsApp!' : 'Compartir resultado'}
-									</Button>
+									</button>
 								</div>
 							) : (
 								<Keyboard
@@ -619,21 +654,25 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				{/* TAB 3: RANKING DEL SQUAD */}
 				<TabsContent value="ranking" className="flex-1 px-4 py-4 space-y-3 overflow-y-auto">
 					{!data.user && (
-						<div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center space-y-2.5">
-							<p className="text-sm font-semibold text-zinc-100">
+						<div className="bg-[#fffdf9] border-2 border-b-4 border-[#e6d8c3] rounded-2xl p-4 text-center space-y-2.5 shadow-xs">
+							<p className="text-sm font-black text-[#292524]">
 								¿Quieres aparecer en la tabla del Squad?
 							</p>
-							<p className="text-xs text-zinc-400">
+							<p className="text-xs text-stone-600">
 								Inicia sesión con tu correo y elige tu apodo. Nunca mostraremos tu correo en la tabla.
 							</p>
-							<Button onClick={() => setAuthOpen(true)} size="sm" className="w-full font-semibold">
+							<button
+								type="button"
+								onClick={() => setAuthOpen(true)}
+								className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 border-2 border-b-4 border-emerald-700 text-white font-black text-xs transition-all cursor-pointer"
+							>
 								Iniciar sesión / Registrarme
-							</Button>
+							</button>
 						</div>
 					)}
 
 					{data.leaderboard.length === 0 ? (
-						<p className="text-center text-xs text-zinc-500 py-8">
+						<p className="text-center text-xs text-stone-500 py-8">
 							Aún no hay jugadores registrados en el ranking.
 						</p>
 					) : (
@@ -642,38 +681,38 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 							return (
 								<div
 									key={player.id}
-									className={`flex items-center justify-between p-3 rounded-xl border ${
+									className={`flex items-center justify-between p-3.5 rounded-2xl border-2 border-b-4 transition-colors ${
 										isMe
-											? 'bg-zinc-900 border-emerald-500/50'
-											: 'bg-zinc-900/40 border-zinc-800/80'
+											? 'bg-emerald-50/90 border-emerald-500 shadow-xs'
+											: 'bg-[#fffdf9] border-[#e6d8c3]'
 									}`}
 								>
 									<div className="flex items-center gap-3">
 										<span
-											className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${
+											className={`w-7 h-7 rounded-full text-xs font-black flex items-center justify-center border ${
 												index === 0
-													? 'bg-amber-400 text-zinc-950'
+													? 'bg-amber-400 border-amber-600 text-amber-950'
 													: index === 1
-														? 'bg-zinc-300 text-zinc-950'
+														? 'bg-stone-200 border-stone-400 text-stone-800'
 														: index === 2
-															? 'bg-amber-700 text-white'
-															: 'bg-zinc-800 text-zinc-400'
+															? 'bg-orange-300 border-orange-500 text-orange-950'
+															: 'bg-[#f7eedb] border-[#e6d8c3] text-stone-600'
 											}`}
 										>
 											{index + 1}
 										</span>
 										<div>
-											<p className="text-sm font-semibold">
+											<p className="text-sm font-extrabold text-[#292524]">
 												{player.name}{' '}
-												{isMe && <span className="text-xs text-emerald-400">(Tú)</span>}
+												{isMe && <span className="text-xs text-emerald-600">(Tú)</span>}
 											</p>
-											<p className="text-xs text-zinc-500">
+											<p className="text-xs text-stone-500 font-medium">
 												{player.gamesWon} ganadas · Racha: {player.currentStreak}
 											</p>
 										</div>
 									</div>
 									<div className="text-right">
-										<p className="text-sm font-extrabold text-zinc-100">{player.totalPoints} pts</p>
+										<p className="text-sm font-black text-emerald-600">{player.totalPoints} pts</p>
 									</div>
 								</div>
 							);

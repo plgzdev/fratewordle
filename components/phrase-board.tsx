@@ -6,8 +6,10 @@ interface PhraseBoardProps {
 	hint: string | null;
 }
 
+const MAX_LIVES = 6;
+
 export function PhraseBoard({ maskedChars, wrongLetters, hint }: PhraseBoardProps) {
-	// Agrupamos por palabras usando los espacios para que no se corten en móvil
+	// Reconstruir palabras individuales para que nunca se parta una palabra a la mitad al saltar de línea
 	const words: string[][] = [];
 	let currentWord: string[] = [];
 
@@ -21,47 +23,53 @@ export function PhraseBoard({ maskedChars, wrongLetters, hint }: PhraseBoardProp
 			currentWord.push(ch);
 		}
 	}
-	if (currentWord.length > 0) words.push(currentWord);
+	if (currentWord.length > 0) {
+		words.push(currentWord);
+	}
 
-	const livesLeft = Math.max(0, 6 - wrongLetters.length);
+	const livesLeft = Math.max(0, MAX_LIVES - wrongLetters.length);
 
 	return (
-		<div className="w-full max-w-lg mx-auto px-3 flex flex-col items-center gap-5">
-			{/* Indicador de vidas y pista */}
-			<div className="flex flex-col items-center gap-2 text-center">
-				<div className="flex items-center gap-1.5">
-					{Array.from({ length: 6 }).map((_, idx) => (
-						<span
-							key={idx}
-							className={`h-2.5 w-7 rounded-full transition-colors ${
-								idx < livesLeft ? 'bg-emerald-500' : 'bg-rose-600/80'
-							}`}
-						/>
-					))}
+		<div className="flex flex-col items-center gap-4 px-3 select-none">
+			{/* Barra de vidas y pista */}
+			<div className="flex flex-wrap items-center justify-center gap-2">
+				<div className="flex items-center gap-1 bg-[#fffdf9] border border-stone-300 px-3 py-1 rounded-full shadow-xs">
+					<span className="text-[11px] font-bold text-stone-500 mr-1">Vidas:</span>
+					{Array.from({ length: MAX_LIVES }).map((_, idx) => {
+						const active = idx < livesLeft;
+						return (
+							<span
+								key={idx}
+								className={`w-2.5 h-2.5 rounded-full transition-all ${
+									active
+										? 'bg-rose-500 shadow-xs shadow-rose-500/40 scale-100'
+										: 'bg-stone-300 scale-90'
+								}`}
+							/>
+						);
+					})}
 				</div>
-				<p className="text-xs text-zinc-400">
-					Vidas restantes: <span className="font-semibold text-zinc-200">{livesLeft}/6</span>
-				</p>
+
 				{hint && (
-					<span className="text-xs bg-zinc-900 border border-zinc-800 text-zinc-300 px-3 py-1 rounded-full">
+					<span className="text-xs font-semibold bg-amber-100 border border-amber-300 text-amber-900 px-3 py-1 rounded-full shadow-xs">
 						Pista: {hint}
 					</span>
 				)}
 			</div>
 
-			{/* Casillas de la frase agrupadas por palabra */}
-			<div className="flex flex-wrap justify-center gap-x-5 gap-y-3 py-2">
+			{/* Tablero de paneles estilo concurso de TV */}
+			<div className="flex flex-wrap justify-center gap-x-4 gap-y-2.5 max-w-md">
 				{words.map((wordChars, wIdx) => (
 					<div key={wIdx} className="flex gap-1">
 						{wordChars.map((ch, cIdx) => {
 							const isHidden = ch === '_';
-							const isSymbol = !/^[A-ZÑ_]$/.test(ch);
+							const isPunctuation = !isHidden && !/^[A-ZÑ]$/.test(ch);
 
-							if (isSymbol) {
+							if (isPunctuation) {
 								return (
 									<span
 										key={cIdx}
-										className="h-10 w-5 flex items-end justify-center text-xl font-bold text-zinc-400 pb-1"
+										className="w-5 h-9 flex items-end justify-center font-black text-lg text-[#292524] pb-1"
 									>
 										{ch}
 									</span>
@@ -71,10 +79,10 @@ export function PhraseBoard({ maskedChars, wrongLetters, hint }: PhraseBoardProp
 							return (
 								<div
 									key={cIdx}
-									className={`h-10 w-8 sm:h-11 sm:w-9 rounded-md border-b-2 flex items-center justify-center text-lg font-bold transition-all ${
+									className={`w-7 h-9 sm:w-8 sm:h-10 rounded-lg border-2 border-b-4 font-black text-base sm:text-lg flex items-center justify-center transition-all duration-200 ${
 										isHidden
-											? 'bg-zinc-900/90 border-zinc-700 text-transparent'
-											: 'bg-emerald-600/20 border-emerald-500 text-emerald-300'
+											? 'bg-[#fffdf9] border-stone-300 text-transparent shadow-xs'
+											: 'bg-emerald-500 border-emerald-700 text-white shadow-sm scale-105'
 									}`}
 								>
 									{isHidden ? '' : ch}
@@ -85,16 +93,16 @@ export function PhraseBoard({ maskedChars, wrongLetters, hint }: PhraseBoardProp
 				))}
 			</div>
 
-			{/* Letras fallidas */}
+			{/* Letras o intentos fallidos */}
 			{wrongLetters.length > 0 && (
-				<div className="flex items-center gap-1.5 flex-wrap justify-center">
-					<span className="text-xs text-zinc-500">Fallos:</span>
-					{wrongLetters.map((l) => (
+				<div className="flex flex-wrap items-center justify-center gap-1.5">
+					<span className="text-[11px] font-bold text-stone-500">Fallos:</span>
+					{wrongLetters.map((wl, i) => (
 						<span
-							key={l}
-							className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-rose-950/70 border border-rose-800/60 text-rose-300"
+							key={`${wl}-${i}`}
+							className="px-2 py-0.5 text-xs font-extrabold rounded-md bg-rose-100 border border-rose-300 text-rose-700"
 						>
-							{l}
+							{wl}
 						</span>
 					))}
 				</div>

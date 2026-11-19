@@ -11,6 +11,14 @@ interface WordBoardProps {
 	shake: boolean;
 }
 
+const MAX_ROWS = 6;
+
+const STATE_STYLES: Record<LetterState, string> = {
+	correct: 'bg-emerald-500 border-emerald-700 text-white shadow-sm',
+	present: 'bg-amber-400 border-amber-600 text-amber-950 shadow-sm',
+	absent: 'bg-stone-300 border-stone-400 text-stone-600'
+};
+
 export function WordBoard({
 	length,
 	guesses,
@@ -19,61 +27,55 @@ export function WordBoard({
 	isPlaying,
 	shake
 }: WordBoardProps) {
-	const rows = Array.from({ length: 6 }, (_, rowIdx) => {
-		if (rowIdx < guesses.length) {
-			return {
-				chars: guesses[rowIdx].split(''),
-				evals: evaluations[rowIdx],
-				isCurrent: false
-			};
-		}
-		if (rowIdx === guesses.length && isPlaying) {
-			const chars = currentGuess.padEnd(length, ' ').split('');
-			return { chars, evals: null, isCurrent: true };
-		}
-		return {
-			chars: Array(length).fill(' '),
-			evals: null,
-			isCurrent: false
-		};
-	});
-
+	// Ajustar tamaño de casilla si la palabra es larga (7, 8 o más letras)
 	const tileSize =
-		length <= 5
-			? 'h-13 text-2xl'
-			: length <= 7
-				? 'h-11 text-xl'
-				: 'h-9 text-base';
+		length >= 9
+			? 'w-8 h-9 text-base'
+			: length >= 7
+				? 'w-10 h-11 text-lg'
+				: 'w-12 h-13 text-xl';
 
 	return (
-		<div className="w-full max-w-md mx-auto px-2 flex flex-col gap-1.5">
-			{rows.map((row, rIdx) => (
-				<div
-					key={rIdx}
-					style={{ gridTemplateColumns: `repeat(${length}, minmax(0, 1fr))` }}
-					className={`grid gap-1.5 ${row.isCurrent && shake ? 'animate-bounce' : ''}`}
-				>
-					{row.chars.map((char, cIdx) => {
-						const state = row.evals?.[cIdx];
-						const filled = char !== ' ';
+		<div className="flex flex-col items-center gap-1.5 px-2 select-none">
+			{Array.from({ length: MAX_ROWS }).map((_, rowIndex) => {
+				const isSubmitted = rowIndex < guesses.length;
+				const isCurrentRow = isPlaying && rowIndex === guesses.length;
+				const rowWord = isSubmitted
+					? guesses[rowIndex]
+					: isCurrentRow
+						? currentGuess.padEnd(length, ' ')
+						: ' '.repeat(length);
 
-						let style = 'border-zinc-800 bg-zinc-950/60 text-zinc-100';
-						if (state === 'correct') style = 'border-emerald-500 bg-emerald-600 text-white';
-						else if (state === 'present') style = 'border-amber-500 bg-amber-500 text-zinc-950';
-						else if (state === 'absent') style = 'border-zinc-800 bg-zinc-800 text-zinc-400';
-						else if (filled) style = 'border-zinc-500 bg-zinc-900 text-white scale-[1.03]';
+				return (
+					<div
+						key={rowIndex}
+						className={`flex gap-1.5 ${isCurrentRow && shake ? 'animate-bounce' : ''}`}
+					>
+						{Array.from({ length }).map((__, colIndex) => {
+							const char = rowWord[colIndex]?.trim() ?? '';
+							const state = isSubmitted ? evaluations[rowIndex]?.[colIndex] : undefined;
 
-						return (
-							<div
-								key={cIdx}
-								className={`${tileSize} border-2 rounded-md font-bold flex items-center justify-center uppercase transition-all ${style}`}
-							>
-								{filled ? char : ''}
-							</div>
-						);
-					})}
-				</div>
-			))}
+							let cellStyle =
+								'bg-[#f7eedb]/80 border-2 border-b-4 border-stone-300/80 text-transparent';
+							if (state) {
+								cellStyle = `border-2 border-b-4 ${STATE_STYLES[state]}`;
+							} else if (char) {
+								cellStyle =
+									'bg-[#fffdf9] border-2 border-b-4 border-amber-500/80 text-[#292524] scale-105 shadow-sm';
+							}
+
+							return (
+								<div
+									key={colIndex}
+									className={`${tileSize} rounded-xl font-black uppercase flex items-center justify-center transition-all duration-150 ${cellStyle}`}
+								>
+									{char}
+								</div>
+							);
+						})}
+					</div>
+				);
+			})}
 		</div>
 	);
 }
