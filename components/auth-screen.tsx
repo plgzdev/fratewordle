@@ -58,7 +58,7 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
 	}
 
 	return (
-		<div className="p-6 space-y-5 bg-[#fffdf9] text-[#292524]">
+		<div className="p-4 sm:p-5 space-y-3.5 bg-[#fffdf9] text-[#292524]">
 			<div className="text-center space-y-1">
 				<div className="w-11 h-11 mx-auto rounded-2xl bg-emerald-500 border-2 border-b-4 border-emerald-700 text-white font-black text-xl flex items-center justify-center shadow-xs">
 					F

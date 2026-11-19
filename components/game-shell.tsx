@@ -431,7 +431,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 
 			{/* Modal de Login Opcional */}
 			<Dialog open={authOpen} onOpenChange={setAuthOpen}>
-				<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] max-w-sm p-0 overflow-hidden">
+				<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] w-[calc(100%-2rem)] max-w-[340px] rounded-2xl p-0 overflow-hidden">
 					<DialogHeader className="sr-only">
 						<DialogTitle>Iniciar sesión en FrateWordleSquad</DialogTitle>
 					</DialogHeader>
