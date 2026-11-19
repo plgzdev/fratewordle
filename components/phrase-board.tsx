@@ -46,9 +46,9 @@ export function PhraseBoard({ maskedChars, wrongLetters, hint }: PhraseBoardProp
 	const livesLeft = Math.max(0, MAX_LIVES - wrongLetters.length);
 
 	return (
-		<div className="flex flex-col items-center gap-4 px-3 select-none">
+		<div className="w-full flex flex-col items-center gap-3 sm:gap-4 px-2 sm:px-3 select-none">
 			{/* Barra de vidas y pista */}
-			<div className="flex flex-wrap items-center justify-center gap-2">
+			<div className="flex flex-wrap items-center justify-center gap-2 max-w-full">
 				<div className="flex items-center gap-1 bg-[#fffdf9] border border-stone-300 px-3 py-1 rounded-full shadow-xs">
 					<span className="text-[11px] font-bold text-stone-500 mr-1">Vidas:</span>
 					{Array.from({ length: MAX_LIVES }).map((_, idx) => {
@@ -67,7 +67,7 @@ export function PhraseBoard({ maskedChars, wrongLetters, hint }: PhraseBoardProp
 				</div>
 
 				{hint && (
-					<span className="text-xs font-semibold bg-amber-100 border border-amber-300 text-amber-900 px-3 py-1 rounded-full shadow-xs">
+					<span className="text-xs font-semibold bg-amber-100 border border-amber-300 text-amber-900 px-3 py-1 rounded-full shadow-xs text-center">
 						Pista: {hint}
 					</span>
 				)}
@@ -75,12 +75,12 @@ export function PhraseBoard({ maskedChars, wrongLetters, hint }: PhraseBoardProp
 
 			{/* Tablero de paneles estilo concurso de TV */}
 			<div
-				className={`flex flex-wrap justify-center gap-x-4 gap-y-2.5 max-w-md ${
+				className={`flex flex-wrap justify-center gap-x-3 sm:gap-x-4 gap-y-2 sm:gap-y-2.5 w-full max-w-md ${
 					shakeBoard ? 'animate-board-shake' : ''
 				}`}
 			>
 				{words.map((wordChars, wIdx) => (
-					<div key={wIdx} className="flex gap-1">
+					<div key={wIdx} className="flex justify-center gap-0.5 sm:gap-1 max-w-full">
 						{wordChars.map((ch, cIdx) => {
 							const isHidden = ch === '_';
 							const isPunctuation = !isHidden && !/^[A-ZÑ]$/.test(ch);
@@ -89,7 +89,7 @@ export function PhraseBoard({ maskedChars, wrongLetters, hint }: PhraseBoardProp
 								return (
 									<span
 										key={cIdx}
-										className="w-5 h-9 flex items-end justify-center font-black text-lg text-[#292524] pb-1"
+										className="w-3.5 sm:w-5 h-8 sm:h-9 shrink-0 flex items-end justify-center font-black text-base sm:text-lg text-[#292524] pb-1"
 									>
 										{ch}
 									</span>
@@ -102,7 +102,7 @@ export function PhraseBoard({ maskedChars, wrongLetters, hint }: PhraseBoardProp
 									style={
 										!isHidden ? { animationDelay: `${cIdx * 45}ms` } : undefined
 									}
-									className={`w-7 h-9 sm:w-8 sm:h-10 rounded-lg border-2 border-b-4 font-black text-base sm:text-lg flex items-center justify-center transition-colors duration-200 ${
+									className={`min-w-0 w-6 h-8 sm:w-8 sm:h-10 rounded-md sm:rounded-lg border-2 border-b-4 font-black text-sm sm:text-lg flex items-center justify-center transition-colors duration-200 ${
 										isHidden
 											? 'bg-[#fffdf9] border-stone-300 text-transparent shadow-xs'
 											: 'bg-emerald-500 border-emerald-700 text-white shadow-sm animate-tile-pop'
@@ -118,7 +118,7 @@ export function PhraseBoard({ maskedChars, wrongLetters, hint }: PhraseBoardProp
 
 			{/* Letras o intentos fallidos */}
 			{wrongLetters.length > 0 && (
-				<div className="flex flex-wrap items-center justify-center gap-1.5">
+				<div className="flex flex-wrap items-center justify-center gap-1.5 max-w-full">
 					<span className="text-[11px] font-bold text-stone-500">Fallos:</span>
 					{wrongLetters.map((wl, i) => (
 						<span

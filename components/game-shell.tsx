@@ -353,19 +353,19 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 		? (data.leaderboards.daily.find((p) => p.id === data.user?.id)?.currentStreak ?? 0)
 		: 0;
 	return (
-		<div className="min-h-dvh bg-retro-board text-[#292524] flex flex-col justify-between">
+		<div className="min-h-dvh w-full overflow-x-hidden bg-retro-board text-[#292524] flex flex-col justify-between">
 			{/* Header cálido estilo tablero clásico */}
-			<header className="border-b-2 border-[#e6d8c3] bg-[#fffdf9]/90 backdrop-blur-md px-4 py-3 flex items-center justify-between max-w-lg w-full mx-auto shadow-xs">
-				<div className="flex items-center gap-2.5">
-					<div className="w-9 h-9 rounded-xl bg-emerald-500 border-2 border-b-4 border-emerald-700 text-white font-black text-lg flex items-center justify-center shadow-xs">
+			<header className="border-b-2 border-[#e6d8c3] bg-[#fffdf9]/90 backdrop-blur-md px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2 max-w-lg w-full mx-auto shadow-xs">
+				<div className="flex items-center gap-2 shrink-0 min-w-0">
+					<div className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-xl bg-emerald-500 border-2 border-b-4 border-emerald-700 text-white font-black text-base sm:text-lg flex items-center justify-center shadow-xs">
 						F
 					</div>
-					<div>
-					<h1 className="font-black text-base tracking-tight text-[#292524]">
-						Frate<span className="text-emerald-600">Wordle</span>Squad
-					</h1>
+					<div className="min-w-0">
+						<h1 className="font-black text-sm sm:text-base tracking-tight text-[#292524] truncate">
+							Frate<span className="text-emerald-600">Wordle</span>Squad
+						</h1>
 						{data.user ? (
-							<div className="flex items-center gap-2 text-xs text-stone-600 font-medium">
+							<div className="flex items-center gap-2 shrink-0 text-xs text-stone-600 font-medium">
 								<span>{data.user.name}</span>
 								<span className="inline-flex items-center gap-0.5 text-orange-600 font-extrabold bg-orange-100 px-1.5 py-0.2 rounded-full">
 									<Flame className="w-3.5 h-3.5 fill-orange-500 text-orange-600" />
@@ -378,7 +378,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 					</div>
 				</div>
 
-				<div className="flex items-center gap-1.5">
+				<div className="flex items-center gap-1.5 shrink-0">
 					{data.user ? (
 						<>
 							<Dialog open={nameOpen} onOpenChange={setNameOpen}>
@@ -520,32 +520,31 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				onValueChange={(v) => setActiveTab(v as 'word' | 'phrase' | 'ranking')}
 				className="flex-1 flex flex-col justify-between max-w-lg w-full mx-auto"
 			>
-				<div className="px-4 pt-3">
-				<TabsList className="grid grid-cols-3 w-full bg-[#f7eedb] border-2 border-[#e6d8c3] p-1 rounded-2xl h-11">
-					<TabsTrigger
-						value="word"
-						className="rounded-xl font-bold text-stone-600 data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-xs"
-					>
-						Palabra
-					</TabsTrigger>
-					<TabsTrigger
-						value="phrase"
-						className="rounded-xl font-bold text-stone-600 data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-xs"
-					>
-						Frase
-					</TabsTrigger>
-					<TabsTrigger
-						value="ranking"
-						className="gap-1.5 rounded-xl font-bold text-stone-600 data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-xs"
-					>
-						<Trophy className="w-3.5 h-3.5" />
-						Ranking
-					</TabsTrigger>
-				</TabsList>
+				<div className="px-3 sm:px-4 pt-2.5 w-full">
+					<TabsList className="grid grid-cols-3 w-full bg-[#f7eedb] border-2 border-[#e6d8c3] p-1 rounded-2xl h-10 sm:h-11">
+						<TabsTrigger
+							value="word"
+							className="rounded-xl text-xs sm:text-sm font-bold text-stone-600 px-1 data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-xs"
+						>
+							Palabra
+						</TabsTrigger>
+						<TabsTrigger
+							value="phrase"
+							className="rounded-xl text-xs sm:text-sm font-bold text-stone-600 px-1 data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-xs"
+						>
+							Frase
+						</TabsTrigger>
+						<TabsTrigger
+							value="ranking"
+							className="gap-1 rounded-xl text-xs sm:text-sm font-bold text-stone-600 px-1 data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-xs"
+						>
+							<Trophy className="w-3.5 h-3.5 shrink-0" />
+							<span>Ranking</span>
+						</TabsTrigger>
+					</TabsList>
 				</div>
-
 				{/* TAB 1: PALABRA DE LONGITUD VARIABLE */}
-				<TabsContent value="word" className="flex-1 flex flex-col justify-between pt-3 pb-2 gap-4">
+				<TabsContent value="word" className="flex-1 flex flex-col justify-center pt-3 pb-6 gap-5">
 					{!data.wordState ? (
 						<p className="text-center text-sm text-stone-500 my-auto">
 							No hay palabra programada para hoy.
@@ -614,14 +613,14 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				</TabsContent>
 
 				{/* TAB 2: FRASE ESTILO RULETA DE LA FORTUNA */}
-				<TabsContent value="phrase" className="flex-1 flex flex-col justify-between pt-4 pb-2 gap-4">
+				<TabsContent value="phrase" className="flex-1 flex flex-col justify-center pt-4 pb-6 gap-6">
 					{!data.phraseState ? (
 						<p className="text-center text-sm text-stone-500 my-auto">
 							No hay frase programada para hoy.
 						</p>
 					) : (
 						<>
-							<div className="my-auto space-y-5">
+							<div className="space-y-5">
 								<PhraseBoard
 									maskedChars={data.phraseState.maskedChars}
 									wrongLetters={data.phraseState.wrongLetters}
@@ -749,7 +748,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 											: 'bg-[#fffdf9] border-[#e6d8c3]'
 									}`}
 								>
-									<div className="flex items-center gap-3">
+									<div className="flex items-center gap-3 shrink-0">
 										<span
 											className={`w-7 h-7 rounded-full text-xs font-black flex items-center justify-center border ${
 												index === 0

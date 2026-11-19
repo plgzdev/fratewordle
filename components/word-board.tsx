@@ -27,15 +27,22 @@ export function WordBoard({
 	isPlaying,
 	shake
 }: WordBoardProps) {
-	const tileSize =
+	const maxWidthClass =
 		length >= 9
-			? 'w-8 h-9 text-base'
+			? 'max-w-[440px]'
 			: length >= 7
-				? 'w-10 h-11 text-lg'
-				: 'w-12 h-13 text-xl';
+				? 'max-w-[420px]'
+				: 'max-w-[350px]';
+
+	const textSizeClass =
+		length >= 9
+			? 'text-sm sm:text-base'
+			: length >= 7
+				? 'text-base sm:text-lg'
+				: 'text-lg sm:text-xl';
 
 	return (
-		<div className="flex flex-col items-center gap-1.5 px-2 select-none">
+		<div className="w-full flex flex-col items-center gap-1 sm:gap-1.5 px-3 select-none">
 			{Array.from({ length: MAX_ROWS }).map((_, rowIndex) => {
 				const isSubmitted = rowIndex < guesses.length;
 				const isLatestSubmitted = rowIndex === guesses.length - 1;
@@ -46,44 +53,47 @@ export function WordBoard({
 						? currentGuess.padEnd(length, ' ')
 						: ' '.repeat(length);
 
-						return (
-							<div
-								key={rowIndex}
-								className={`flex gap-1.5 ${isCurrentRow && shake ? 'animate-board-shake' : ''}`}
-							>
-								{Array.from({ length }).map((__, colIndex) => {
-									const char = rowWord[colIndex]?.trim() ?? '';
-									const state = isSubmitted ? evaluations[rowIndex]?.[colIndex] : undefined;
-						
-									let cellStyle =
-										'bg-[#f7eedb]/80 border-2 border-b-4 border-stone-300/80 text-transparent';
-									if (state) {
-										cellStyle = `border-2 border-b-4 ${STATE_STYLES[state]}`;
-									} else if (char) {
-										cellStyle =
-											'bg-[#fffdf9] border-2 border-b-4 border-amber-500/80 text-[#292524] scale-105 shadow-sm';
+				return (
+					<div
+						key={rowIndex}
+						style={{ gridTemplateColumns: `repeat(${length}, minmax(0, 1fr))` }}
+						className={`grid w-full ${maxWidthClass} gap-1 sm:gap-1.5 ${
+							isCurrentRow && shake ? 'animate-board-shake' : ''
+						}`}
+					>
+						{Array.from({ length }).map((__, colIndex) => {
+							const char = rowWord[colIndex]?.trim() ?? '';
+							const state = isSubmitted ? evaluations[rowIndex]?.[colIndex] : undefined;
+
+							let cellStyle =
+								'bg-[#f7eedb]/80 border-2 border-b-4 border-stone-300/80 text-transparent';
+							if (state) {
+								cellStyle = `border-2 border-b-4 ${STATE_STYLES[state]}`;
+							} else if (char) {
+								cellStyle =
+									'bg-[#fffdf9] border-2 border-b-4 border-amber-500/80 text-[#292524] scale-[1.03] shadow-sm';
+							}
+
+							return (
+								<div
+									key={colIndex}
+									style={
+										isLatestSubmitted
+											? { animationDelay: `${colIndex * 110}ms` }
+											: undefined
 									}
-						
-									return (
-										<div
-											key={colIndex}
-											style={
-												isLatestSubmitted
-													? { animationDelay: `${colIndex * 110}ms` }
-													: undefined
-											}
-											className={`${tileSize} rounded-xl font-black uppercase flex items-center justify-center ${cellStyle} ${
-												isLatestSubmitted
-													? 'animate-tile-flip will-change-transform'
-													: 'transition-transform duration-100'
-											}`}
-										>
-											{char}
-										</div>
-									);
-								})}
-							</div>
-						);
+									className={`aspect-square w-full ${textSizeClass} rounded-lg sm:rounded-xl font-black uppercase flex items-center justify-center ${cellStyle} ${
+										isLatestSubmitted
+											? 'animate-tile-flip will-change-transform'
+											: 'transition-transform duration-100'
+									}`}
+								>
+									{char}
+								</div>
+							);
+						})}
+					</div>
+				);
 			})}
 		</div>
 	);
