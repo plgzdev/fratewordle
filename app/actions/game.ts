@@ -143,31 +143,57 @@ export async function getInitialGameData() {
 		};
 	}
 
-	// Ranking sin correos electrónicos, solo apodos
-	const totalPointsExpr = sql<number>`coalesce(sum(${gameAttempts.score}), 0)`.mapWith(Number);
-	const totalSecondsExpr =
-		sql<number>`coalesce(sum(extract(epoch from (${gameAttempts.finishedAt} - ${gameAttempts.startedAt}))), 999999)`.mapWith(
-			Number
-		);
+	// Fechas límite (YYYY-MM-DD) para Diario, Semanal (Lunes a Hoy) y Mensual (Día 1 a Hoy)
+	const [y, m, d] = today.split('-').map(Number);
+	const todayUtc = new Date(Date.UTC(y, m - 1, d));
+	const dayOfWeek = todayUtc.getUTCDay(); // 0 = Dom, 1 = Lun, ..., 6 = Sáb
+	const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+	const mondayUtc = new Date(Date.UTC(y, m - 1, d - diffToMonday));
 
-	const rawLeaderboard = await db
-		.select({
-			id: user.id,
-			name: user.name,
-			currentStreak: user.currentStreak,
-			maxStreak: user.maxStreak,
-			totalPoints: totalPointsExpr,
-			gamesWon: sql<number>`count(case when ${gameAttempts.status} = 'won' then 1 end)`.mapWith(Number),
-			totalSeconds: totalSecondsExpr
-		})
-		.from(user)
-		.leftJoin(gameAttempts, eq(user.id, gameAttempts.userId))
-		.groupBy(user.id)
-		.orderBy(desc(totalPointsExpr), asc(totalSecondsExpr));
-	const leaderboard = rawLeaderboard.map((row) => ({
-		...row,
-		name: sanitizeDisplayName(row.name)
-	}));
+	const weekStartStr = mondayUtc.toISOString().slice(0, 10);
+	const monthStartStr = `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-01`;
+
+	async function buildLeaderboard(minDateStr: string) {
+		const ptsExpr =
+			sql<number>`coalesce(sum(case when ${dailyWords.dateStr} >= ${minDateStr} then ${gameAttempts.score} else 0 end), 0)`.mapWith(
+				Number
+			);
+		const wonExpr =
+			sql<number>`count(case when ${dailyWords.dateStr} >= ${minDateStr} and ${gameAttempts.status} = 'won' then 1 end)`.mapWith(
+				Number
+			);
+		const secExpr =
+			sql<number>`coalesce(sum(case when ${dailyWords.dateStr} >= ${minDateStr} then extract(epoch from (${gameAttempts.finishedAt} - ${gameAttempts.startedAt})) else 0 end), 999999)`.mapWith(
+				Number
+			);
+
+		const rows = await db
+			.select({
+				id: user.id,
+				name: user.name,
+				currentStreak: user.currentStreak,
+				maxStreak: user.maxStreak,
+				totalPoints: ptsExpr,
+				gamesWon: wonExpr,
+				totalSeconds: secExpr
+			})
+			.from(user)
+			.leftJoin(gameAttempts, eq(user.id, gameAttempts.userId))
+			.leftJoin(dailyWords, eq(gameAttempts.wordId, dailyWords.id))
+			.groupBy(user.id)
+			.orderBy(desc(ptsExpr), desc(wonExpr), asc(secExpr));
+
+		return rows.map((row) => ({
+			...row,
+			name: sanitizeDisplayName(row.name)
+		}));
+	}
+
+	const [dailyLeaderboard, weeklyLeaderboard, monthlyLeaderboard] = await Promise.all([
+		buildLeaderboard(today),
+		buildLeaderboard(weekStartStr),
+		buildLeaderboard(monthStartStr)
+	]);
 
 	return {
 		user: session
@@ -178,7 +204,11 @@ export async function getInitialGameData() {
 			: null,
 		wordState,
 		phraseState,
-		leaderboard
+		leaderboards: {
+			daily: dailyLeaderboard,
+			weekly: weeklyLeaderboard,
+			monthly: monthlyLeaderboard
+		}
 	};
 }
 

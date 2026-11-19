@@ -32,11 +32,13 @@ type GameStatus = 'playing' | 'won' | 'lost';
 export function GameShell({ initialData }: { initialData: InitialData }) {
 	const [data, setData] = useState<InitialData>(initialData);
 	const [activeTab, setActiveTab] = useState<'word' | 'phrase' | 'ranking'>('word');
+	const [rankingPeriod, setRankingPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
 	const [currentGuess, setCurrentGuess] = useState('');
 	const [submitting, setSubmitting] = useState(false);
 	const [toastMsg, setToastMsg] = useState<string | null>(null);
 	const [shake, setShake] = useState(false);
 	const [copied, setCopied] = useState(false);
+	const [logoutOpen, setLogoutOpen] = useState(false);
 
 	// Modal de login opcional, edición de apodo y resolver frase completa
 	const [authOpen, setAuthOpen] = useState(false);
@@ -281,7 +283,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 	// Soporte para teclado físico en PC
 	useEffect(() => {
 		function onKeyDown(e: KeyboardEvent) {
-			if (nameOpen || authOpen || solveOpen || activeTab === 'ranking') return;
+			if (nameOpen || authOpen || solveOpen || logoutOpen || activeTab === 'ranking') return;
 			if (e.ctrlKey || e.metaKey || e.altKey) return;
 
 			const k = e.key.toUpperCase();
@@ -348,9 +350,8 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 	}
 
 	const currentUserStreak = data.user
-		? (data.leaderboard.find((p) => p.id === data.user?.id)?.currentStreak ?? 0)
+		? (data.leaderboards.daily.find((p) => p.id === data.user?.id)?.currentStreak ?? 0)
 		: 0;
-
 	return (
 		<div className="min-h-dvh bg-retro-board text-[#292524] flex flex-col justify-between">
 			{/* Header cálido estilo tablero clásico */}
@@ -409,10 +410,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 							<Button
 								variant="ghost"
 								size="icon"
-								onClick={async () => {
-									await authClient.signOut();
-									window.location.reload();
-								}}
+								onClick={() => setLogoutOpen(true)}
 								className="rounded-xl text-stone-500 hover:text-rose-600 hover:bg-rose-50"
 							>
 								<LogOut className="w-4 h-4" />
@@ -475,6 +473,37 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 							{submitting ? 'Comprobando...' : 'Comprobar frase'}
 						</button>
 					</form>
+				</DialogContent>
+			</Dialog>
+
+			{/* Modal de confirmación para Cerrar Sesión */}
+			<Dialog open={logoutOpen} onOpenChange={setLogoutOpen}>
+				<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] max-w-xs">
+					<DialogHeader>
+						<DialogTitle className="font-black text-base">¿Cerrar sesión?</DialogTitle>
+					</DialogHeader>
+					<p className="text-xs text-stone-600 leading-relaxed">
+						Tu progreso y tu racha quedan guardados en tu cuenta. Podrás volver a entrar cuando quieras con tu correo y contraseña.
+					</p>
+					<div className="flex gap-2 pt-2">
+						<button
+							type="button"
+							onClick={() => setLogoutOpen(false)}
+							className="flex-1 py-2 rounded-xl bg-[#f7eedb] hover:bg-stone-200 border-2 border-b-4 border-stone-300 text-stone-700 font-bold text-xs transition-all cursor-pointer"
+						>
+							Cancelar
+						</button>
+						<button
+							type="button"
+							onClick={async () => {
+								await authClient.signOut();
+								window.location.reload();
+							}}
+							className="flex-1 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 active:translate-y-0.5 border-2 border-b-4 border-rose-700 text-white font-black text-xs transition-all cursor-pointer"
+						>
+							Sí, salir
+						</button>
+					</div>
 				</DialogContent>
 			</Dialog>
 
@@ -655,6 +684,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				</TabsContent>
 
 				{/* TAB 3: RANKING DEL SQUAD */}
+				{/* TAB 3: RANKING DEL SQUAD (DIARIO / SEMANAL / MENSUAL) */}
 				<TabsContent value="ranking" className="flex-1 px-4 py-4 space-y-3 overflow-y-auto">
 					{!data.user && (
 						<div className="bg-[#fffdf9] border-2 border-b-4 border-[#e6d8c3] rounded-2xl p-4 text-center space-y-2.5 shadow-xs">
@@ -674,12 +704,41 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 						</div>
 					)}
 
-					{data.leaderboard.length === 0 ? (
-						<p className="text-center text-xs text-stone-500 py-8">
-							Aún no hay jugadores registrados en el ranking.
-						</p>
-					) : (
-						data.leaderboard.map((player, index) => {
+					{/* Selector Hoy / Semana / Mes */}
+					<div className="grid grid-cols-3 bg-[#f7eedb] border-2 border-[#e6d8c3] p-1 rounded-xl text-xs font-extrabold">
+						{(
+							[
+								{ id: 'daily', label: 'Hoy' },
+								{ id: 'weekly', label: 'Esta Semana' },
+								{ id: 'monthly', label: 'Este Mes' }
+							] as const
+						).map((tab) => (
+							<button
+								key={tab.id}
+								type="button"
+								onClick={() => setRankingPeriod(tab.id)}
+								className={`py-1.5 rounded-lg transition-all cursor-pointer ${
+									rankingPeriod === tab.id
+										? 'bg-amber-400 text-amber-950 shadow-xs'
+										: 'text-stone-600 hover:text-stone-900'
+								}`}
+							>
+								{tab.label}
+							</button>
+						))}
+					</div>
+
+					{(() => {
+						const activeBoard = data.leaderboards[rankingPeriod];
+						if (activeBoard.length === 0) {
+							return (
+								<p className="text-center text-xs text-stone-500 py-8">
+									Aún no hay jugadores registrados en el ranking.
+								</p>
+							);
+						}
+
+						return activeBoard.map((player, index) => {
 							const isMe = data.user?.id === player.id;
 							return (
 								<div
@@ -710,7 +769,9 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 												{isMe && <span className="text-xs text-emerald-600">(Tú)</span>}
 											</p>
 											<p className="text-xs text-stone-500 font-medium">
-												{player.gamesWon} ganadas · Racha: {player.currentStreak}
+												{player.gamesWon}{' '}
+												{player.gamesWon === 1 ? 'ganada' : 'ganadas'} · Racha:{' '}
+												{player.currentStreak}
 											</p>
 										</div>
 									</div>
@@ -719,8 +780,8 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 									</div>
 								</div>
 							);
-						})
-					)}
+						});
+					})()}
 				</TabsContent>
 			</Tabs>
 		</div>
