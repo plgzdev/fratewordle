@@ -263,7 +263,7 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
 								maxLength={24}
 								value={name}
 								onChange={(e) => setName(e.target.value)}
-								placeholder="Ej. Paul"
+								placeholder="Ej. Ardrubal Chiquito"
 								className="pl-9 bg-[#fdf8ee] border-stone-300 text-[#292524]"
 							/>
 						</div>
