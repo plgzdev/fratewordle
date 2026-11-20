@@ -299,7 +299,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 
 		window.addEventListener('keydown', onKeyDown);
 		return () => window.removeEventListener('keydown', onKeyDown);
-	}, [activeTab, authOpen, handlePhraseKey, handleWordKey, nameOpen, solveOpen]);
+	}, [activeTab, authOpen, handlePhraseKey, handleWordKey, logoutOpen, nameOpen, solveOpen]);
 
 	async function handleShare(mode: 'word' | 'phrase') {
 		const appUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -352,10 +352,11 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 	const currentUserStreak = data.user
 		? (data.leaderboards.daily.find((p) => p.id === data.user?.id)?.currentStreak ?? 0)
 		: 0;
+
 	return (
 		<div className="h-dvh w-full overflow-hidden bg-retro-board text-[#292524] flex flex-col">
 			{/* Header cálido estilo tablero clásico */}
-			<header className="border-b-2 border-[#e6d8c3] bg-[#fffdf9]/90 backdrop-blur-md px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2 max-w-lg w-full mx-auto shadow-xs">
+			<header className="border-b-2 border-[#e6d8c3] bg-[#fffdf9]/90 backdrop-blur-md px-3 sm:px-4 py-2 flex items-center justify-between gap-2 max-w-lg w-full mx-auto shadow-xs shrink-0">
 				<div className="flex items-center gap-2 shrink-0 min-w-0">
 					<div className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-xl bg-emerald-500 border-2 border-b-4 border-emerald-700 text-white font-black text-base sm:text-lg flex items-center justify-center shadow-xs">
 						F
@@ -515,9 +516,13 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 			)}
 
 			{/* Contenido principal con pestañas */}
-			<Tabs defaultValue="word" className="flex-1 min-h-0 flex flex-col max-w-lg w-full mx-auto">
-				<div className="px-3 sm:px-4 pt-2.5 w-full">
-					<TabsList className="grid grid-cols-3 w-full bg-[#f7eedb] border-2 border-[#e6d8c3] p-1 rounded-2xl h-10 sm:h-11">
+			<Tabs
+				value={activeTab}
+				onValueChange={(v) => setActiveTab(v as 'word' | 'phrase' | 'ranking')}
+				className="flex-1 min-h-0 flex flex-col max-w-lg w-full mx-auto"
+			>
+				<div className="px-3 sm:px-4 pt-2 w-full shrink-0">
+					<TabsList className="grid grid-cols-3 w-full bg-[#f7eedb] border-2 border-[#e6d8c3] p-1 rounded-2xl h-10">
 						<TabsTrigger
 							value="word"
 							className="rounded-xl text-xs sm:text-sm font-bold text-stone-600 px-1 data-[state=active]:bg-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-xs"
@@ -539,24 +544,20 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 						</TabsTrigger>
 					</TabsList>
 				</div>
+
 				{/* TAB 1: PALABRA DE LONGITUD VARIABLE */}
-				<TabsContent value="word" className="flex-1 min-h-0 flex flex-col justify-center py-2 gap-2.5 sm:gap-5">
+				<TabsContent value="word" className="flex-1 min-h-0 flex flex-col overflow-y-auto py-2">
 					{!data.wordState ? (
 						<p className="text-center text-sm text-stone-500 my-auto">
 							No hay palabra programada para hoy.
 						</p>
 					) : (
-						<>
-							<div className="text-center space-y-1.5 px-4">
-								<p className="text-xs text-stone-600 font-medium">
-									Palabra de <span className="font-black text-[#292524]">{data.wordState.length} letras</span>
-								</p>
-								{data.wordState.hint && (
-									<span className="inline-block text-xs font-semibold bg-amber-100 border border-amber-300 text-amber-900 px-3 py-0.5 rounded-full shadow-xs">
-										Pista: {data.wordState.hint}
-									</span>
-								)}
-							</div>
+						<div className="my-auto w-full flex flex-col items-center gap-2.5 sm:gap-4">
+							{data.wordState.hint && (
+								<span className="inline-block text-xs font-semibold bg-amber-100 border border-amber-300 text-amber-900 px-3 py-0.5 rounded-full shadow-xs">
+									Pista: {data.wordState.hint}
+								</span>
+							)}
 
 							<WordBoard
 								length={data.wordState.length}
@@ -568,7 +569,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 							/>
 
 							{data.wordState.status !== 'playing' ? (
-								<div className="px-4 py-3 text-center space-y-3">
+								<div className="w-full px-4 py-2 text-center space-y-2.5">
 									<div className="bg-[#fffdf9] border-2 border-b-4 border-[#e6d8c3] rounded-2xl p-4 space-y-1 shadow-sm">
 										<p className="text-xs font-bold text-stone-500">
 											{data.wordState.status === 'won' ? '¡Adivinada!' : 'La palabra era:'}
@@ -576,7 +577,9 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 										<p className="text-2xl font-black tracking-widest text-emerald-600">
 											{data.wordState.solution}
 										</p>
-										<p className="text-xs font-semibold text-stone-500">Puntos hoy: {data.wordState.score}</p>
+										<p className="text-xs font-semibold text-stone-500">
+											Puntos hoy: {data.wordState.score}
+										</p>
 									</div>
 									{!data.user && (
 										<button
@@ -604,19 +607,19 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 									onKey={handleWordKey}
 								/>
 							)}
-						</>
+						</div>
 					)}
 				</TabsContent>
 
 				{/* TAB 2: FRASE ESTILO RULETA DE LA FORTUNA */}
-				<TabsContent value="phrase" className="flex-1 min-h-0 flex flex-col justify-center py-2 gap-3 sm:gap-5">
+				<TabsContent value="phrase" className="flex-1 min-h-0 flex flex-col overflow-y-auto py-2">
 					{!data.phraseState ? (
 						<p className="text-center text-sm text-stone-500 my-auto">
 							No hay frase programada para hoy.
 						</p>
 					) : (
-						<>
-							<div className="space-y-5">
+						<div className="my-auto w-full flex flex-col items-center gap-3 sm:gap-5">
+							<div className="w-full space-y-3 sm:space-y-4">
 								<PhraseBoard
 									maskedChars={data.phraseState.maskedChars}
 									wrongLetters={data.phraseState.wrongLetters}
@@ -628,7 +631,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 										<button
 											type="button"
 											onClick={() => setSolveOpen(true)}
-											className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 active:translate-y-0.5 text-amber-950 font-black text-xs uppercase tracking-wider shadow-md border-2 border-b-4 border-amber-600 transition-all cursor-pointer"
+											className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 active:translate-y-0.5 text-amber-950 font-black text-xs uppercase tracking-wider shadow-md border-2 border-b-4 border-amber-600 transition-all cursor-pointer"
 										>
 											<Sparkles className="w-4 h-4 stroke-[2.5] text-amber-900" />
 											Resolver frase completa
@@ -638,7 +641,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 							</div>
 
 							{data.phraseState.status !== 'playing' ? (
-								<div className="px-4 py-3 text-center space-y-3">
+								<div className="w-full px-4 py-2 text-center space-y-2.5">
 									<div className="bg-[#fffdf9] border-2 border-b-4 border-[#e6d8c3] rounded-2xl p-4 space-y-1 shadow-sm">
 										<p className="text-xs font-bold text-stone-500">
 											{data.phraseState.status === 'won' ? '¡Frase completada!' : 'La frase era:'}
@@ -646,7 +649,9 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 										<p className="text-base font-black tracking-wide text-emerald-600">
 											{data.phraseState.solution}
 										</p>
-										<p className="text-xs font-semibold text-stone-500">Puntos hoy: {data.phraseState.score}</p>
+										<p className="text-xs font-semibold text-stone-500">
+											Puntos hoy: {data.phraseState.score}
+										</p>
 									</div>
 									{!data.user && (
 										<button
@@ -674,13 +679,12 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 									onKey={handlePhraseKey}
 								/>
 							)}
-						</>
+						</div>
 					)}
 				</TabsContent>
 
-				{/* TAB 3: RANKING DEL SQUAD */}
 				{/* TAB 3: RANKING DEL SQUAD (DIARIO / SEMANAL / MENSUAL) */}
-				<TabsContent value="ranking" className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 py-3">
+				<TabsContent value="ranking" className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 py-3 space-y-3">
 					{!data.user && (
 						<div className="bg-[#fffdf9] border-2 border-b-4 border-[#e6d8c3] rounded-2xl p-4 text-center space-y-2.5 shadow-xs">
 							<p className="text-sm font-black text-[#292524]">
