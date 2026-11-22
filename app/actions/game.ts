@@ -195,11 +195,41 @@ export async function getInitialGameData() {
 		buildLeaderboard(monthStartStr)
 	]);
 
+	const currentUserRow = session
+		? await db
+				.select({
+					email: user.email,
+					currentStreak: user.currentStreak,
+					maxStreak: user.maxStreak
+				})
+				.from(user)
+				.where(eq(user.id, session.user.id))
+				.then((r) => r[0])
+		: null;
+
+	const allTimeStats = session
+		? await db
+				.select({
+					totalPoints: sql<number>`coalesce(sum(${gameAttempts.score}), 0)`.mapWith(Number),
+					gamesWon: sql<number>`count(case when ${gameAttempts.status} = 'won' then 1 end)`.mapWith(Number),
+					gamesPlayed: sql<number>`count(case when ${gameAttempts.status} != 'playing' then 1 end)`.mapWith(Number)
+				})
+				.from(gameAttempts)
+				.where(eq(gameAttempts.userId, session.user.id))
+				.then((r) => r[0])
+		: null;
+
 	return {
 		user: session
 			? {
 					id: session.user.id,
-					name: sanitizeDisplayName(session.user.name)
+					name: sanitizeDisplayName(session.user.name),
+					email: currentUserRow?.email ?? session.user.email,
+					currentStreak: currentUserRow?.currentStreak ?? 0,
+					maxStreak: currentUserRow?.maxStreak ?? 0,
+					totalPoints: allTimeStats?.totalPoints ?? 0,
+					gamesWon: allTimeStats?.gamesWon ?? 0,
+					gamesPlayed: allTimeStats?.gamesPlayed ?? 0
 				}
 			: null,
 		wordState,
@@ -520,4 +550,3 @@ export async function updateDisplayName(newName: string) {
 	await db.update(user).set({ name: cleaned }).where(eq(user.id, session.user.id));
 	return { ok: true as const };
 }
-

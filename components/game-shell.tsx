@@ -15,7 +15,6 @@ import { PhraseBoard } from './phrase-board';
 import { Keyboard } from './keyboard';
 import { AuthScreen } from './auth-screen';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
 	Dialog,
@@ -24,7 +23,23 @@ import {
 	DialogTitle,
 	DialogTrigger
 } from '@/components/ui/dialog';
-import { Flame, LogIn, LogOut, Share2, Sparkles, Trophy, UserPen } from 'lucide-react';
+import {
+	Award,
+	CheckCircle2,
+	Flame,
+	KeyRound,
+	Lock,
+	LogIn,
+	LogOut,
+	Mail,
+	Pencil,
+	Share2,
+	Sparkles,
+	Star,
+	Trophy,
+	User,
+	UserPen
+} from 'lucide-react';
 
 type InitialData = Awaited<ReturnType<typeof getInitialGameData>>;
 type GameStatus = 'playing' | 'won' | 'lost';
@@ -40,10 +55,29 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 	const [copied, setCopied] = useState(false);
 	const [logoutOpen, setLogoutOpen] = useState(false);
 
-	// Modal de login opcional, edición de apodo y resolver frase completa
+	// Modal de login opcional, perfil de usuario y resolver frase completa
 	const [authOpen, setAuthOpen] = useState(false);
-	const [nameOpen, setNameOpen] = useState(false);
+	const [profileOpen, setProfileOpen] = useState(false);
 	const [nameInput, setNameInput] = useState(initialData.user?.name ?? '');
+	const [savingName, setSavingName] = useState(false);
+
+	// Cambio de correo electrónico
+	const [editingEmail, setEditingEmail] = useState(false);
+	const [newEmailInput, setNewEmailInput] = useState('');
+	const [savingEmail, setSavingEmail] = useState(false);
+	const [emailError, setEmailError] = useState<string | null>(null);
+	const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
+
+	// Cambio y recuperación de contraseña dentro del modal de perfil
+	const [passwordMode, setPasswordMode] = useState<'closed' | 'change' | 'recover'>('closed');
+	const [currentPassword, setCurrentPassword] = useState('');
+	const [newPassword, setNewPassword] = useState('');
+	const [recoverOtp, setRecoverOtp] = useState('');
+	const [sendingRecoverOtp, setSendingRecoverOtp] = useState(false);
+	const [changingPass, setChangingPass] = useState(false);
+	const [passError, setPassError] = useState<string | null>(null);
+	const [passSuccess, setPassSuccess] = useState<string | null>(null);
+
 	const [solveOpen, setSolveOpen] = useState(false);
 	const [solveInput, setSolveInput] = useState('');
 
@@ -283,7 +317,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 	// Soporte para teclado físico en PC
 	useEffect(() => {
 		function onKeyDown(e: KeyboardEvent) {
-			if (nameOpen || authOpen || solveOpen || logoutOpen || activeTab === 'ranking') return;
+			if (profileOpen || authOpen || solveOpen || logoutOpen || activeTab === 'ranking') return;
 			if (e.ctrlKey || e.metaKey || e.altKey) return;
 
 			const k = e.key.toUpperCase();
@@ -299,7 +333,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 
 		window.addEventListener('keydown', onKeyDown);
 		return () => window.removeEventListener('keydown', onKeyDown);
-	}, [activeTab, authOpen, handlePhraseKey, handleWordKey, logoutOpen, nameOpen, solveOpen]);
+	}, [activeTab, authOpen, handlePhraseKey, handleWordKey, logoutOpen, profileOpen, solveOpen]);
 
 	async function handleShare(mode: 'word' | 'phrase') {
 		const appUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -341,17 +375,157 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 
 	async function handleSaveName(e: React.FormEvent) {
 		e.preventDefault();
+		if (savingName) return;
+		setSavingName(true);
 		const res = await updateDisplayName(nameInput);
+		setSavingName(false);
 		if ('ok' in res) {
-			setNameOpen(false);
 			await refreshData();
 			showToast('Apodo actualizado');
+		} else {
+			showToast('El apodo debe tener al menos 2 letras');
 		}
 	}
 
-	const currentUserStreak = data.user
-		? (data.leaderboards.daily.find((p) => p.id === data.user?.id)?.currentStreak ?? 0)
-		: 0;
+	async function handleChangeEmail(e: React.FormEvent) {
+		e.preventDefault();
+		const cleanEmail = newEmailInput.trim().toLowerCase();
+		if (!cleanEmail || !data.user || cleanEmail === data.user.email.toLowerCase()) return;
+
+		setEmailError(null);
+		setEmailSuccess(null);
+		setSavingEmail(true);
+
+		try {
+			const res = await authClient.changeEmail({
+				newEmail: cleanEmail,
+				callbackURL: '/'
+			});
+
+			setSavingEmail(false);
+			if (res.error) {
+				setEmailError(res.error.message || 'No se pudo iniciar el cambio de correo.');
+				return;
+			}
+
+			setEditingEmail(false);
+			setNewEmailInput('');
+			setEmailSuccess(`Te enviamos un enlace de confirmación a ${cleanEmail}.`);
+		} catch {
+			setSavingEmail(false);
+			setEmailError('Ocurrió un error al solicitar el cambio de correo.');
+		}
+	}
+
+	function resetProfileModalStates() {
+		setEditingEmail(false);
+		setNewEmailInput('');
+		setEmailError(null);
+		setEmailSuccess(null);
+		setPasswordMode('closed');
+		setPassError(null);
+		setPassSuccess(null);
+		setCurrentPassword('');
+		setNewPassword('');
+		setRecoverOtp('');
+	}
+
+	async function handleChangePassword(e: React.FormEvent) {
+		e.preventDefault();
+		setPassError(null);
+		setPassSuccess(null);
+
+		if (newPassword.length < 6) {
+			setPassError('La nueva contraseña debe tener al menos 6 caracteres.');
+			return;
+		}
+
+		setChangingPass(true);
+		try {
+			const res = await authClient.changePassword({
+				currentPassword,
+				newPassword,
+				revokeOtherSessions: false
+			});
+
+			setChangingPass(false);
+			if (res.error) {
+				setPassError('La contraseña actual es incorrecta.');
+				return;
+			}
+
+			setCurrentPassword('');
+			setNewPassword('');
+			setPassSuccess('¡Contraseña actualizada correctamente!');
+		} catch {
+			setChangingPass(false);
+			setPassError('No se pudo actualizar la contraseña.');
+		}
+	}
+
+	async function handleStartProfileRecover() {
+		if (!data.user?.email || sendingRecoverOtp) return;
+		setPassError(null);
+		setPassSuccess(null);
+		setSendingRecoverOtp(true);
+
+		try {
+			const res = await authClient.forgetPassword.emailOtp({
+				email: data.user.email
+			});
+
+			setSendingRecoverOtp(false);
+			if (res.error) {
+				setPassError('No se pudo enviar el código. Intenta en un momento.');
+				return;
+			}
+
+			setRecoverOtp('');
+			setNewPassword('');
+			setPasswordMode('recover');
+			setPassSuccess(`Te enviamos un código de 6 dígitos a ${data.user.email}`);
+		} catch {
+			setSendingRecoverOtp(false);
+			setPassError('Error al enviar el código al correo.');
+		}
+	}
+
+	async function handleConfirmProfileRecover(e: React.FormEvent) {
+		e.preventDefault();
+		if (!data.user?.email || changingPass) return;
+		setPassError(null);
+		setPassSuccess(null);
+
+		if (newPassword.length < 6) {
+			setPassError('La nueva contraseña debe tener al menos 6 caracteres.');
+			return;
+		}
+
+		setChangingPass(true);
+		try {
+			const res = await authClient.emailOtp.resetPassword({
+				email: data.user.email,
+				otp: recoverOtp.trim(),
+				password: newPassword
+			});
+
+			setChangingPass(false);
+			if (res.error) {
+				setPassError('Código incorrecto o expirado.');
+				return;
+			}
+
+			setRecoverOtp('');
+			setNewPassword('');
+			setPasswordMode('change');
+			setPassSuccess('¡Contraseña restablecida correctamente!');
+		} catch {
+			setChangingPass(false);
+			setPassError('No se pudo restablecer la contraseña.');
+		}
+	}
+
+	const currentUserStreak = data.user?.currentStreak ?? 0;
 
 	return (
 		<div className="h-dvh w-full overflow-hidden bg-retro-board text-[#292524] flex flex-col">
@@ -382,40 +556,389 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				<div className="flex items-center gap-1.5 shrink-0">
 					{data.user ? (
 						<>
-							<Dialog open={nameOpen} onOpenChange={setNameOpen}>
-								<DialogTrigger className="inline-flex items-center justify-center h-9 w-9 rounded-xl bg-[#f7eedb] border border-stone-300 text-stone-700 hover:bg-amber-100 transition-colors cursor-pointer">
+							<Dialog
+								open={profileOpen}
+								onOpenChange={(open) => {
+									setProfileOpen(open);
+									if (!open) resetProfileModalStates();
+								}}
+							>
+								<DialogTrigger
+									title="Mi Perfil"
+									className="inline-flex items-center justify-center h-9 w-9 rounded-xl bg-[#f7eedb] border border-stone-300 text-stone-700 hover:bg-amber-100 transition-colors cursor-pointer"
+								>
 									<UserPen className="w-4 h-4" />
 								</DialogTrigger>
-								<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] max-w-xs">
+								<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] w-[calc(100%-2rem)] max-w-[360px] rounded-2xl p-4 sm:p-5 max-h-[90dvh] overflow-y-auto">
 									<DialogHeader>
-										<DialogTitle>Tu apodo en el Squad</DialogTitle>
+										<DialogTitle className="flex items-center gap-2 font-black text-base">
+											<span className="w-7 h-7 rounded-lg bg-emerald-500 border-b-2 border-emerald-700 text-white text-xs font-black flex items-center justify-center">
+												{data.user.name.charAt(0).toUpperCase()}
+											</span>
+											Mi Perfil del Squad
+										</DialogTitle>
 									</DialogHeader>
-									<form onSubmit={handleSaveName} className="space-y-3 pt-2">
-										<Input
-											value={nameInput}
-											onChange={(e) => setNameInput(e.target.value)}
-											maxLength={24}
-											placeholder="Tu apodo"
-											className="bg-[#fdf8ee] border-stone-300 text-[#292524]"
-										/>
-										<Button
-											type="submit"
-											className="w-full bg-emerald-600 hover:bg-emerald-500 border-b-4 border-emerald-800 text-white font-bold"
+
+									<div className="space-y-4 pt-1">
+										{/* Correo de la cuenta con opción de editar */}
+										<div className="space-y-2">
+											{!editingEmail ? (
+												<div className="flex items-center justify-between gap-2 bg-[#fdf8ee] border border-[#e6d8c3] rounded-xl px-3 py-2 text-xs text-stone-600">
+													<div className="flex items-center gap-2 min-w-0">
+														<Mail className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+														<span className="truncate font-medium">{data.user.email}</span>
+													</div>
+													<button
+														type="button"
+														onClick={() => {
+															setEditingEmail(true);
+															setNewEmailInput('');
+															setEmailError(null);
+															setEmailSuccess(null);
+														}}
+														className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 shrink-0 cursor-pointer"
+													>
+														<Pencil className="w-3 h-3" />
+														Cambiar
+													</button>
+												</div>
+											) : (
+												<form
+													onSubmit={handleChangeEmail}
+													className="bg-[#fdf8ee] border border-[#e6d8c3] rounded-xl p-2.5 space-y-2"
+												>
+													<div className="flex items-center justify-between">
+														<span className="text-[11px] font-bold text-stone-600">
+															Nuevo correo electrónico
+														</span>
+														<button
+															type="button"
+															onClick={() => {
+																setEditingEmail(false);
+																setEmailError(null);
+															}}
+															className="text-[11px] font-bold text-stone-400 hover:text-stone-700 cursor-pointer"
+														>
+															Cancelar
+														</button>
+													</div>
+													<div className="flex gap-1.5">
+														<Input
+															type="email"
+															required
+															value={newEmailInput}
+															onChange={(e) => setNewEmailInput(e.target.value)}
+															placeholder="nuevo@correo.com"
+															className="bg-white border-stone-300 text-[#292524] h-8 text-xs"
+														/>
+														<button
+															type="submit"
+															disabled={savingEmail || !newEmailInput.trim()}
+															className="px-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 border-b-2 border-emerald-700 text-white font-black text-xs disabled:opacity-40 cursor-pointer shrink-0"
+														>
+															{savingEmail ? '...' : 'Enviar'}
+														</button>
+													</div>
+												</form>
+											)}
+
+											{emailError && (
+												<p className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5">
+													{emailError}
+												</p>
+											)}
+
+											{emailSuccess && (
+												<p className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
+													{emailSuccess}
+												</p>
+											)}
+										</div>
+
+										{/* Estadísticas del jugador */}
+										<div className="grid grid-cols-2 gap-2">
+											<div className="bg-[#fdf8ee] border-2 border-b-4 border-[#e6d8c3] rounded-xl p-2.5 flex items-center gap-2.5">
+												<div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+													<Flame className="w-4 h-4 fill-orange-500" />
+												</div>
+												<div>
+													<p className="text-sm font-black leading-tight text-[#292524]">
+														{data.user.currentStreak}
+													</p>
+													<p className="text-[11px] font-semibold text-stone-500">
+														Racha actual
+													</p>
+												</div>
+											</div>
+
+											<div className="bg-[#fdf8ee] border-2 border-b-4 border-[#e6d8c3] rounded-xl p-2.5 flex items-center gap-2.5">
+												<div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+													<Award className="w-4 h-4" />
+												</div>
+												<div>
+													<p className="text-sm font-black leading-tight text-[#292524]">
+														{data.user.maxStreak}
+													</p>
+													<p className="text-[11px] font-semibold text-stone-500">
+														Mejor racha
+													</p>
+												</div>
+											</div>
+
+											<div className="bg-[#fdf8ee] border-2 border-b-4 border-[#e6d8c3] rounded-xl p-2.5 flex items-center gap-2.5">
+												<div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+													<Star className="w-4 h-4 fill-emerald-500" />
+												</div>
+												<div>
+													<p className="text-sm font-black leading-tight text-[#292524]">
+														{data.user.totalPoints}
+													</p>
+													<p className="text-[11px] font-semibold text-stone-500">
+														Puntos totales
+													</p>
+												</div>
+											</div>
+
+											<div className="bg-[#fdf8ee] border-2 border-b-4 border-[#e6d8c3] rounded-xl p-2.5 flex items-center gap-2.5">
+												<div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
+													<CheckCircle2 className="w-4 h-4" />
+												</div>
+												<div>
+													<p className="text-sm font-black leading-tight text-[#292524]">
+														{data.user.gamesWon}{' '}
+														<span className="text-xs font-semibold text-stone-400">
+															/ {data.user.gamesPlayed}
+														</span>
+													</p>
+													<p className="text-[11px] font-semibold text-stone-500">
+														Ganadas
+													</p>
+												</div>
+											</div>
+										</div>
+
+										{/* Editar Apodo */}
+										<form
+											onSubmit={handleSaveName}
+											className="space-y-2 pt-2 border-t border-[#e6d8c3]"
 										>
-											Guardar
-										</Button>
-									</form>
+											<label className="text-xs font-bold text-stone-600 flex items-center gap-1.5">
+												<User className="w-3.5 h-3.5 text-stone-400" />
+												Apodo en el Ranking
+											</label>
+											<div className="flex gap-2">
+												<Input
+													value={nameInput}
+													onChange={(e) => setNameInput(e.target.value)}
+													maxLength={24}
+													placeholder="Tu apodo"
+													className="bg-[#fdf8ee] border-stone-300 text-[#292524] h-9 text-sm"
+												/>
+												<button
+													type="submit"
+													disabled={
+														savingName ||
+														nameInput.trim().length < 2 ||
+														nameInput.trim() === data.user.name
+													}
+													className="px-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 border-2 border-b-4 border-emerald-700 text-white font-black text-xs transition-all disabled:opacity-40 cursor-pointer shrink-0"
+												>
+													{savingName ? '...' : 'Guardar'}
+												</button>
+											</div>
+										</form>
+
+										{/* Sección Cambiar / Recuperar Contraseña */}
+										<div className="pt-2 border-t border-[#e6d8c3]">
+											{passwordMode === 'closed' && (
+												<button
+													type="button"
+													onClick={() => {
+														setPasswordMode('change');
+														setPassError(null);
+														setPassSuccess(null);
+													}}
+													className="w-full py-2 px-3 rounded-xl bg-[#f7eedb] hover:bg-amber-100/70 border border-[#e6d8c3] text-stone-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+												>
+													<KeyRound className="w-3.5 h-3.5 text-amber-600" />
+													Cambiar contraseña
+												</button>
+											)}
+
+											{passwordMode === 'change' && (
+												<form onSubmit={handleChangePassword} className="space-y-2.5">
+													<div className="flex items-center justify-between">
+														<span className="text-xs font-bold text-stone-600 flex items-center gap-1.5">
+															<Lock className="w-3.5 h-3.5 text-stone-400" />
+															Cambiar contraseña
+														</span>
+														<button
+															type="button"
+															onClick={() => {
+																setPasswordMode('closed');
+																setPassError(null);
+																setPassSuccess(null);
+																setCurrentPassword('');
+																setNewPassword('');
+															}}
+															className="text-[11px] font-bold text-stone-400 hover:text-stone-700 cursor-pointer"
+														>
+															Cancelar
+														</button>
+													</div>
+
+													<Input
+														type="password"
+														required
+														value={currentPassword}
+														onChange={(e) => setCurrentPassword(e.target.value)}
+														placeholder="Contraseña actual"
+														className="bg-[#fdf8ee] border-stone-300 text-[#292524] h-9 text-xs"
+													/>
+													<Input
+														type="password"
+														required
+														minLength={6}
+														value={newPassword}
+														onChange={(e) => setNewPassword(e.target.value)}
+														placeholder="Nueva contraseña (mín. 6 caracteres)"
+														className="bg-[#fdf8ee] border-stone-300 text-[#292524] h-9 text-xs"
+													/>
+
+													<div className="flex justify-end">
+														<button
+															type="button"
+															disabled={sendingRecoverOtp}
+															onClick={handleStartProfileRecover}
+															className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer disabled:opacity-50"
+														>
+															{sendingRecoverOtp
+																? 'Enviando código...'
+																: '¿Olvidaste tu contraseña? Recuperar por correo'}
+														</button>
+													</div>
+
+													{passError && (
+														<p className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5">
+															{passError}
+														</p>
+													)}
+
+													{passSuccess && (
+														<p className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
+															{passSuccess}
+														</p>
+													)}
+
+													<button
+														type="submit"
+														disabled={changingPass}
+														className="w-full py-2 rounded-xl bg-amber-400 hover:bg-amber-300 active:translate-y-0.5 border-2 border-b-4 border-amber-600 text-amber-950 font-black text-xs transition-all disabled:opacity-50 cursor-pointer"
+													>
+														{changingPass ? 'Actualizando...' : 'Actualizar contraseña'}
+													</button>
+												</form>
+											)}
+
+											{passwordMode === 'recover' && (
+												<form onSubmit={handleConfirmProfileRecover} className="space-y-2.5">
+													<div className="flex items-center justify-between">
+														<span className="text-xs font-bold text-stone-600 flex items-center gap-1.5">
+															<KeyRound className="w-3.5 h-3.5 text-amber-600" />
+															Recuperar por correo
+														</span>
+														<button
+															type="button"
+															onClick={() => {
+																setPasswordMode('closed');
+																setPassError(null);
+																setPassSuccess(null);
+																setRecoverOtp('');
+																setNewPassword('');
+															}}
+															className="text-[11px] font-bold text-stone-400 hover:text-stone-700 cursor-pointer"
+														>
+															Cancelar
+														</button>
+													</div>
+
+													<Input
+														type="text"
+														inputMode="numeric"
+														autoComplete="one-time-code"
+														required
+														maxLength={6}
+														value={recoverOtp}
+														onChange={(e) => setRecoverOtp(e.target.value.replace(/\D/g, ''))}
+														placeholder="Código de 6 dígitos"
+														className="text-center font-black tracking-[0.3em] bg-[#fdf8ee] border-stone-300 text-[#292524] h-9 text-sm"
+													/>
+													<Input
+														type="password"
+														required
+														minLength={6}
+														value={newPassword}
+														onChange={(e) => setNewPassword(e.target.value)}
+														placeholder="Nueva contraseña (mín. 6 caracteres)"
+														className="bg-[#fdf8ee] border-stone-300 text-[#292524] h-9 text-xs"
+													/>
+
+													{passError && (
+														<p className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5">
+															{passError}
+														</p>
+													)}
+
+													{passSuccess && (
+														<p className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
+															{passSuccess}
+														</p>
+													)}
+
+													<div className="flex items-center justify-between pt-0.5 text-[11px]">
+														<button
+															type="button"
+															onClick={() => {
+																setPasswordMode('change');
+																setPassError(null);
+																setPassSuccess(null);
+															}}
+															className="font-bold text-stone-500 hover:text-stone-800 cursor-pointer"
+														>
+															← Usar contraseña actual
+														</button>
+														<button
+															type="button"
+															disabled={sendingRecoverOtp}
+															onClick={handleStartProfileRecover}
+															className="font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer disabled:opacity-50"
+														>
+															{sendingRecoverOtp ? 'Enviando...' : 'Reenviar código'}
+														</button>
+													</div>
+
+													<button
+														type="submit"
+														disabled={changingPass || recoverOtp.length < 6 || newPassword.length < 6}
+														className="w-full py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 border-2 border-b-4 border-emerald-700 text-white font-black text-xs transition-all disabled:opacity-50 cursor-pointer"
+													>
+														{changingPass ? 'Guardando...' : 'Restablecer contraseña'}
+													</button>
+												</form>
+											)}
+										</div>
+									</div>
 								</DialogContent>
 							</Dialog>
 
-							<Button
-								variant="ghost"
-								size="icon"
+							<button
+								type="button"
 								onClick={() => setLogoutOpen(true)}
-								className="rounded-xl text-stone-500 hover:text-rose-600 hover:bg-rose-50"
+								title="Cerrar sesión"
+								className="inline-flex items-center justify-center h-9 w-9 rounded-xl text-stone-500 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
 							>
 								<LogOut className="w-4 h-4" />
-							</Button>
+							</button>
 						</>
 					) : (
 						<button
