@@ -148,6 +148,19 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 		notify('Eliminado.');
 	}
 
+	async function handleDeleteDay(day: {
+		dateStr: string;
+		word?: ScheduleItem;
+		phrase?: ScheduleItem;
+	}) {
+		const ids = [day.word?.id, day.phrase?.id].filter((id): id is number => Boolean(id));
+		if (ids.length === 0) return;
+
+		await Promise.all(ids.map((id) => deleteChallenge(id)));
+		await reload();
+		notify(`Día ${day.dateStr} eliminado por completo.`);
+	}
+
 	return (
 		<div className="min-h-dvh bg-zinc-950 text-zinc-100 px-4 py-6">
 			<div className="max-w-xl mx-auto space-y-6">
@@ -401,6 +414,8 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 							<div className="space-y-2.5">
 								{paginatedDays.map((day) => {
 									const isToday = day.dateStr === schedule.today;
+									const itemsInDay = (day.word ? 1 : 0) + (day.phrase ? 1 : 0);
+
 									return (
 										<div
 											key={day.dateStr}
@@ -408,8 +423,8 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 												isToday ? 'border-emerald-500/50' : 'border-zinc-800'
 											}`}
 										>
-											{/* Cabecera del día */}
-											<div className="flex items-center justify-between border-b border-zinc-800/80 pb-1.5">
+											{/* Cabecera del día con botón para borrar todo el día */}
+											<div className="flex items-center justify-between gap-2 border-b border-zinc-800/80 pb-1.5">
 												<div className="flex items-center gap-2">
 													<span className="text-xs font-mono font-bold text-zinc-200">
 														{day.dateStr}
@@ -420,11 +435,27 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 														</span>
 													)}
 												</div>
-												<span className="text-[11px] text-zinc-500">
-													{[day.word && 'Palabra', day.phrase && 'Frase']
-														.filter(Boolean)
-														.join(' + ')}
-												</span>
+
+												<div className="flex items-center gap-2">
+													<span className="text-[11px] text-zinc-500 hidden sm:inline">
+														{[day.word && 'Palabra', day.phrase && 'Frase']
+															.filter(Boolean)
+															.join(' + ')}
+													</span>
+													<button
+														type="button"
+														onClick={() => handleDeleteDay(day)}
+														title={
+															itemsInDay > 1
+																? 'Borrar palabra y frase de este día'
+																: 'Borrar día'
+														}
+														className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-300 hover:text-rose-200 text-[11px] font-bold transition-colors cursor-pointer"
+													>
+														<Trash2 className="w-3 h-3" />
+														Borrar día
+													</button>
+												</div>
 											</div>
 
 											{/* Retos del día en 2 columnas en desktop / apilados compactos en móvil */}
@@ -453,7 +484,7 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 																<button
 																	type="button"
 																	onClick={() => handleDelete(day.word!.id)}
-																	title="Eliminar palabra"
+																	title="Eliminar solo la palabra"
 																	className="p-1 text-zinc-500 hover:text-rose-400 rounded cursor-pointer shrink-0"
 																>
 																	<Trash2 className="w-3.5 h-3.5" />
@@ -487,7 +518,7 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 																<button
 																	type="button"
 																	onClick={() => handleDelete(day.phrase!.id)}
-																	title="Eliminar frase"
+																	title="Eliminar solo la frase"
 																	className="p-1 text-zinc-500 hover:text-rose-400 rounded cursor-pointer shrink-0"
 																>
 																	<Trash2 className="w-3.5 h-3.5" />
