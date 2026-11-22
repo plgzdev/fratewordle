@@ -68,15 +68,22 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 	const [emailError, setEmailError] = useState<string | null>(null);
 	const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
 
-	// Cambio y recuperación de contraseña dentro del modal de perfil
-	const [passwordMode, setPasswordMode] = useState<'closed' | 'change' | 'recover'>('closed');
+	// Cambio de contraseña dentro del perfil + Modal independiente de Recuperar Contraseña
+	const [showPasswordForm, setShowPasswordForm] = useState(false);
 	const [currentPassword, setCurrentPassword] = useState('');
 	const [newPassword, setNewPassword] = useState('');
-	const [recoverOtp, setRecoverOtp] = useState('');
-	const [sendingRecoverOtp, setSendingRecoverOtp] = useState(false);
 	const [changingPass, setChangingPass] = useState(false);
 	const [passError, setPassError] = useState<string | null>(null);
 	const [passSuccess, setPassSuccess] = useState<string | null>(null);
+
+	// Modal dedicado para recuperar contraseña por OTP (como en el inicio de sesión)
+	const [recoverOpen, setRecoverOpen] = useState(false);
+	const [recoverOtp, setRecoverOtp] = useState('');
+	const [recoverNewPassword, setRecoverNewPassword] = useState('');
+	const [sendingRecoverOtp, setSendingRecoverOtp] = useState(false);
+	const [recoverLoading, setRecoverLoading] = useState(false);
+	const [recoverError, setRecoverError] = useState<string | null>(null);
+	const [recoverInfo, setRecoverInfo] = useState<string | null>(null);
 
 	const [solveOpen, setSolveOpen] = useState(false);
 	const [solveInput, setSolveInput] = useState('');
@@ -317,7 +324,15 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 	// Soporte para teclado físico en PC
 	useEffect(() => {
 		function onKeyDown(e: KeyboardEvent) {
-			if (profileOpen || authOpen || solveOpen || logoutOpen || activeTab === 'ranking') return;
+			if (
+				profileOpen ||
+				recoverOpen ||
+				authOpen ||
+				solveOpen ||
+				logoutOpen ||
+				activeTab === 'ranking'
+			)
+				return;
 			if (e.ctrlKey || e.metaKey || e.altKey) return;
 
 			const k = e.key.toUpperCase();
@@ -333,7 +348,16 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 
 		window.addEventListener('keydown', onKeyDown);
 		return () => window.removeEventListener('keydown', onKeyDown);
-	}, [activeTab, authOpen, handlePhraseKey, handleWordKey, logoutOpen, profileOpen, solveOpen]);
+	}, [
+		activeTab,
+		authOpen,
+		handlePhraseKey,
+		handleWordKey,
+		logoutOpen,
+		profileOpen,
+		recoverOpen,
+		solveOpen
+	]);
 
 	async function handleShare(mode: 'word' | 'phrase') {
 		const appUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -422,12 +446,11 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 		setNewEmailInput('');
 		setEmailError(null);
 		setEmailSuccess(null);
-		setPasswordMode('closed');
+		setShowPasswordForm(false);
 		setPassError(null);
 		setPassSuccess(null);
 		setCurrentPassword('');
 		setNewPassword('');
-		setRecoverOtp('');
 	}
 
 	async function handleChangePassword(e: React.FormEvent) {
@@ -463,10 +486,13 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 		}
 	}
 
-	async function handleStartProfileRecover() {
+	// Abre el modal dedicado de recuperar contraseña (igual al de inicio de sesión)
+	async function handleOpenRecoverModal() {
 		if (!data.user?.email || sendingRecoverOtp) return;
 		setPassError(null);
 		setPassSuccess(null);
+		setRecoverError(null);
+		setRecoverInfo(null);
 		setSendingRecoverOtp(true);
 
 		try {
@@ -481,47 +507,62 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 			}
 
 			setRecoverOtp('');
-			setNewPassword('');
-			setPasswordMode('recover');
-			setPassSuccess(`Te enviamos un código de 6 dígitos a ${data.user.email}`);
+			setRecoverNewPassword('');
+			setRecoverInfo(`Te enviamos un código de 6 dígitos a ${data.user.email}`);
+			setProfileOpen(false);
+			resetProfileModalStates();
+			setRecoverOpen(true);
 		} catch {
 			setSendingRecoverOtp(false);
 			setPassError('Error al enviar el código al correo.');
 		}
 	}
 
-	async function handleConfirmProfileRecover(e: React.FormEvent) {
-		e.preventDefault();
-		if (!data.user?.email || changingPass) return;
-		setPassError(null);
-		setPassSuccess(null);
+	async function handleResendRecoverOtp() {
+		if (!data.user?.email || sendingRecoverOtp) return;
+		setRecoverError(null);
+		setRecoverInfo(null);
+		setSendingRecoverOtp(true);
 
-		if (newPassword.length < 6) {
-			setPassError('La nueva contraseña debe tener al menos 6 caracteres.');
-			return;
+		const res = await authClient.forgetPassword.emailOtp({
+			email: data.user.email
+		});
+
+		setSendingRecoverOtp(false);
+		if (res.error) {
+			setRecoverError('Espera un momento antes de pedir otro código.');
+		} else {
+			setRecoverInfo('Nuevo código enviado a tu correo.');
 		}
+	}
 
-		setChangingPass(true);
+	async function handleConfirmRecoverModal(e: React.FormEvent) {
+		e.preventDefault();
+		if (!data.user?.email || recoverLoading) return;
+		setRecoverError(null);
+		setRecoverInfo(null);
+		setRecoverLoading(true);
+
 		try {
 			const res = await authClient.emailOtp.resetPassword({
 				email: data.user.email,
 				otp: recoverOtp.trim(),
-				password: newPassword
+				password: recoverNewPassword
 			});
 
-			setChangingPass(false);
+			setRecoverLoading(false);
 			if (res.error) {
-				setPassError('Código incorrecto o expirado.');
+				setRecoverError('Código incorrecto, expirado o contraseña inválida.');
 				return;
 			}
 
+			setRecoverOpen(false);
 			setRecoverOtp('');
-			setNewPassword('');
-			setPasswordMode('change');
-			setPassSuccess('¡Contraseña restablecida correctamente!');
+			setRecoverNewPassword('');
+			showToast('¡Contraseña restablecida!');
 		} catch {
-			setChangingPass(false);
-			setPassError('No se pudo restablecer la contraseña.');
+			setRecoverLoading(false);
+			setRecoverError('No se pudo restablecer la contraseña.');
 		}
 	}
 
@@ -748,13 +789,13 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 											</div>
 										</form>
 
-										{/* Sección Cambiar / Recuperar Contraseña */}
+										{/* Sección Cambiar Contraseña */}
 										<div className="pt-2 border-t border-[#e6d8c3]">
-											{passwordMode === 'closed' && (
+											{!showPasswordForm ? (
 												<button
 													type="button"
 													onClick={() => {
-														setPasswordMode('change');
+														setShowPasswordForm(true);
 														setPassError(null);
 														setPassSuccess(null);
 													}}
@@ -763,9 +804,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 													<KeyRound className="w-3.5 h-3.5 text-amber-600" />
 													Cambiar contraseña
 												</button>
-											)}
-
-											{passwordMode === 'change' && (
+											) : (
 												<form onSubmit={handleChangePassword} className="space-y-2.5">
 													<div className="flex items-center justify-between">
 														<span className="text-xs font-bold text-stone-600 flex items-center gap-1.5">
@@ -775,7 +814,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 														<button
 															type="button"
 															onClick={() => {
-																setPasswordMode('closed');
+																setShowPasswordForm(false);
 																setPassError(null);
 																setPassSuccess(null);
 																setCurrentPassword('');
@@ -809,7 +848,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 														<button
 															type="button"
 															disabled={sendingRecoverOtp}
-															onClick={handleStartProfileRecover}
+															onClick={handleOpenRecoverModal}
 															className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer disabled:opacity-50"
 														>
 															{sendingRecoverOtp
@@ -839,93 +878,6 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 													</button>
 												</form>
 											)}
-
-											{passwordMode === 'recover' && (
-												<form onSubmit={handleConfirmProfileRecover} className="space-y-2.5">
-													<div className="flex items-center justify-between">
-														<span className="text-xs font-bold text-stone-600 flex items-center gap-1.5">
-															<KeyRound className="w-3.5 h-3.5 text-amber-600" />
-															Recuperar por correo
-														</span>
-														<button
-															type="button"
-															onClick={() => {
-																setPasswordMode('closed');
-																setPassError(null);
-																setPassSuccess(null);
-																setRecoverOtp('');
-																setNewPassword('');
-															}}
-															className="text-[11px] font-bold text-stone-400 hover:text-stone-700 cursor-pointer"
-														>
-															Cancelar
-														</button>
-													</div>
-
-													<Input
-														type="text"
-														inputMode="numeric"
-														autoComplete="one-time-code"
-														required
-														maxLength={6}
-														value={recoverOtp}
-														onChange={(e) => setRecoverOtp(e.target.value.replace(/\D/g, ''))}
-														placeholder="Código de 6 dígitos"
-														className="text-center font-black tracking-[0.3em] bg-[#fdf8ee] border-stone-300 text-[#292524] h-9 text-sm"
-													/>
-													<Input
-														type="password"
-														required
-														minLength={6}
-														value={newPassword}
-														onChange={(e) => setNewPassword(e.target.value)}
-														placeholder="Nueva contraseña (mín. 6 caracteres)"
-														className="bg-[#fdf8ee] border-stone-300 text-[#292524] h-9 text-xs"
-													/>
-
-													{passError && (
-														<p className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5">
-															{passError}
-														</p>
-													)}
-
-													{passSuccess && (
-														<p className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
-															{passSuccess}
-														</p>
-													)}
-
-													<div className="flex items-center justify-between pt-0.5 text-[11px]">
-														<button
-															type="button"
-															onClick={() => {
-																setPasswordMode('change');
-																setPassError(null);
-																setPassSuccess(null);
-															}}
-															className="font-bold text-stone-500 hover:text-stone-800 cursor-pointer"
-														>
-															← Usar contraseña actual
-														</button>
-														<button
-															type="button"
-															disabled={sendingRecoverOtp}
-															onClick={handleStartProfileRecover}
-															className="font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer disabled:opacity-50"
-														>
-															{sendingRecoverOtp ? 'Enviando...' : 'Reenviar código'}
-														</button>
-													</div>
-
-													<button
-														type="submit"
-														disabled={changingPass || recoverOtp.length < 6 || newPassword.length < 6}
-														className="w-full py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 border-2 border-b-4 border-emerald-700 text-white font-black text-xs transition-all disabled:opacity-50 cursor-pointer"
-													>
-														{changingPass ? 'Guardando...' : 'Restablecer contraseña'}
-													</button>
-												</form>
-											)}
 										</div>
 									</div>
 								</DialogContent>
@@ -952,6 +904,114 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 					)}
 				</div>
 			</header>
+
+			{/* Modal independiente de Recuperar Contraseña (mismo diseño que AuthScreen) */}
+			<Dialog
+				open={recoverOpen}
+				onOpenChange={(open) => {
+					setRecoverOpen(open);
+					if (!open) {
+						setRecoverOtp('');
+						setRecoverNewPassword('');
+						setRecoverError(null);
+						setRecoverInfo(null);
+					}
+				}}
+			>
+				<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] w-[calc(100%-2rem)] max-w-[340px] rounded-2xl p-0 overflow-hidden">
+					<DialogHeader className="sr-only">
+						<DialogTitle>Recuperar contraseña</DialogTitle>
+					</DialogHeader>
+					<div className="p-4 sm:p-5 space-y-3.5 bg-[#fffdf9] text-[#292524]">
+						<div className="text-center space-y-1">
+							<div className="w-10 h-10 mx-auto rounded-2xl bg-amber-400 border-2 border-b-4 border-amber-600 text-amber-950 font-black flex items-center justify-center shadow-xs">
+								<KeyRound className="w-5 h-5" />
+							</div>
+							<h2 className="text-base font-black tracking-tight pt-1">Nueva contraseña</h2>
+							<p className="text-xs text-stone-500">
+								Código enviado a{' '}
+								<span className="font-bold text-[#292524]">{data.user?.email}</span>
+							</p>
+						</div>
+
+						<form onSubmit={handleConfirmRecoverModal} className="space-y-3">
+							<div className="space-y-1">
+								<label className="text-xs font-bold text-stone-600">Código de 6 dígitos</label>
+								<Input
+									type="text"
+									inputMode="numeric"
+									autoComplete="one-time-code"
+									required
+									maxLength={6}
+									value={recoverOtp}
+									onChange={(e) => setRecoverOtp(e.target.value.replace(/\D/g, ''))}
+									placeholder="000000"
+									className="text-center text-lg font-black tracking-[0.35em] bg-[#fdf8ee] border-stone-300 text-[#292524] h-11"
+								/>
+							</div>
+
+							<div className="space-y-1">
+								<label className="text-xs font-bold text-stone-600">Nueva contraseña</label>
+								<div className="relative">
+									<Lock className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+									<Input
+										type="password"
+										required
+										minLength={6}
+										value={recoverNewPassword}
+										onChange={(e) => setRecoverNewPassword(e.target.value)}
+										placeholder="Mínimo 6 caracteres"
+										className="pl-9 bg-[#fdf8ee] border-stone-300 text-[#292524]"
+									/>
+								</div>
+							</div>
+
+							{recoverInfo && (
+								<p className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+									{recoverInfo}
+								</p>
+							)}
+
+							{recoverError && (
+								<p className="text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+									{recoverError}
+								</p>
+							)}
+
+							<button
+								type="submit"
+								disabled={
+									recoverLoading || recoverOtp.length < 6 || recoverNewPassword.length < 6
+								}
+								className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 border-2 border-b-4 border-emerald-700 text-white font-black text-sm tracking-wide transition-all disabled:opacity-50 cursor-pointer"
+							>
+								{recoverLoading ? 'Guardando...' : 'Guardar nueva contraseña'}
+							</button>
+
+							<div className="flex items-center justify-between pt-1 text-xs">
+								<button
+									type="button"
+									onClick={() => {
+										setRecoverOpen(false);
+										setProfileOpen(true);
+									}}
+									className="font-bold text-stone-500 hover:text-stone-800 cursor-pointer"
+								>
+									← Volver al perfil
+								</button>
+								<button
+									type="button"
+									disabled={sendingRecoverOtp}
+									onClick={handleResendRecoverOtp}
+									className="font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer disabled:opacity-50"
+								>
+									{sendingRecoverOtp ? 'Enviando...' : 'Reenviar código'}
+								</button>
+							</div>
+						</form>
+					</div>
+				</DialogContent>
+			</Dialog>
 
 			{/* Modal de Login Opcional */}
 			<Dialog open={authOpen} onOpenChange={setAuthOpen}>
