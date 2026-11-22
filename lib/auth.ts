@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { emailOTP } from 'better-auth/plugins';
+import nodemailer from 'nodemailer';
 import { db } from '@/db';
 import * as schema from '@/db/schema';
 
@@ -21,22 +22,27 @@ export const auth = betterAuth({
 			async sendVerificationOTP({ email, otp, type }) {
 				if (type !== 'email-verification') return;
 
-				const apiKey = process.env.RESEND_API_KEY;
-				const from = process.env.EMAIL_FROM || 'FrateWordleSquad <onboarding@resend.dev>';
+				const gmailUser = process.env.GMAIL_USER;
+				const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
 
-				if (!apiKey) {
+				if (!gmailUser || !gmailAppPassword) {
 					console.log(`[DEV OTP] Código de verificación para ${email}: ${otp}`);
 					return;
 				}
 
-				const res = await fetch('https://api.resend.com/emails', {
-					method: 'POST',
-					headers: {
-						Authorization: `Bearer ${apiKey}`,
-						'Content-Type': 'application/json'
-					},
-					body: JSON.stringify({
-						from,
+				const transporter = nodemailer.createTransport({
+					host: 'smtp.gmail.com',
+					port: 465,
+					secure: true,
+					auth: {
+						user: gmailUser,
+						pass: gmailAppPassword
+					}
+				});
+
+				try {
+					await transporter.sendMail({
+						from: `"FrateWordleSquad" <${gmailUser}>`,
 						to: email,
 						subject: `${otp} es tu código de verificación - FrateWordleSquad`,
 						html: `
@@ -49,12 +55,9 @@ export const auth = betterAuth({
 								<p style="margin:16px 0 0;font-size:12px;color:#78716c;">Este código expira en 5 minutos. Si no creaste esta cuenta, ignora este mensaje.</p>
 							</div>
 						`
-					})
-				});
-
-				if (!res.ok) {
-					const errText = await res.text();
-					console.error('Error enviando OTP con Resend:', errText);
+					});
+				} catch (err) {
+					console.error('Error enviando OTP con Gmail:', err);
 					throw new Error('No se pudo enviar el código de verificación');
 				}
 			}
