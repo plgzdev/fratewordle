@@ -11,18 +11,30 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, CalendarPlus, Layers, Search, Trash2 } from 'lucide-react';
+import {
+	ArrowLeft,
+	CalendarPlus,
+	ChevronLeft,
+	ChevronRight,
+	Layers,
+	Search,
+	Trash2
+} from 'lucide-react';
 
 type ScheduleData = NonNullable<Awaited<ReturnType<typeof getAdminSchedule>>>;
+type ScheduleItem = ScheduleData['items'][number];
+
+const DAYS_PER_PAGE = 5;
 
 export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData }) {
 	const [schedule, setSchedule] = useState<ScheduleData>(initialSchedule);
 	const [loading, setLoading] = useState(false);
 	const [msg, setMsg] = useState<string | null>(null);
 
-	// Filtros de la lista programada
+	// Filtros y paginación de la lista programada
 	const [modeFilter, setModeFilter] = useState<'all' | 'word' | 'phrase'>('all');
 	const [searchQuery, setSearchQuery] = useState('');
+	const [page, setPage] = useState(1);
 
 	// Estado formulario por lote
 	const [bulkStartDate, setBulkStartDate] = useState(initialSchedule.today);
@@ -55,18 +67,40 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 		[schedule.items]
 	);
 
-	const filteredItems = useMemo(() => {
+	// Agrupar items por fecha (1 tarjeta por día con Palabra + Frase juntas)
+	const groupedDays = useMemo(() => {
 		const q = searchQuery.trim().toLowerCase();
-		return schedule.items.filter((item) => {
-			if (modeFilter !== 'all' && item.mode !== modeFilter) return false;
-			if (!q) return true;
-			return (
-				item.word.toLowerCase().includes(q) ||
-				item.dateStr.includes(q) ||
-				(item.hint?.toLowerCase().includes(q) ?? false)
-			);
-		});
+		const map = new Map<
+			string,
+			{ dateStr: string; word?: ScheduleItem; phrase?: ScheduleItem }
+		>();
+
+		for (const item of schedule.items) {
+			if (modeFilter !== 'all' && item.mode !== modeFilter) continue;
+			if (
+				q &&
+				!item.word.toLowerCase().includes(q) &&
+				!item.dateStr.includes(q) &&
+				!(item.hint?.toLowerCase().includes(q) ?? false)
+			) {
+				continue;
+			}
+
+			const existing = map.get(item.dateStr) ?? { dateStr: item.dateStr };
+			if (item.mode === 'word') existing.word = item;
+			else existing.phrase = item;
+			map.set(item.dateStr, existing);
+		}
+
+		return Array.from(map.values()).sort((a, b) => a.dateStr.localeCompare(b.dateStr));
 	}, [modeFilter, schedule.items, searchQuery]);
+
+	const totalPages = Math.max(1, Math.ceil(groupedDays.length / DAYS_PER_PAGE));
+	const safePage = Math.min(page, totalPages);
+	const paginatedDays = useMemo(() => {
+		const start = (safePage - 1) * DAYS_PER_PAGE;
+		return groupedDays.slice(start, start + DAYS_PER_PAGE);
+	}, [groupedDays, safePage]);
 
 	async function handleBulkSubmit(e: React.FormEvent) {
 		e.preventDefault();
@@ -284,18 +318,21 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 					</TabsContent>
 				</Tabs>
 
-				{/* LISTA DE PRÓXIMOS DÍAS PROGRAMADOS CON FILTROS */}
+				{/* LISTA DE PRÓXIMOS DÍAS AGRUPADA POR FECHA + PAGINACIÓN */}
 				<div className="space-y-3">
 					<div className="flex flex-wrap items-center justify-between gap-2">
 						<h2 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-							Programados desde hoy ({schedule.items.length})
+							Días programados ({groupedDays.length})
 						</h2>
 
 						{/* Botones de filtro: Todos / Palabras / Frases */}
 						<div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 p-1 rounded-xl text-xs font-bold">
 							<button
 								type="button"
-								onClick={() => setModeFilter('all')}
+								onClick={() => {
+									setModeFilter('all');
+									setPage(1);
+								}}
 								className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
 									modeFilter === 'all'
 										? 'bg-zinc-100 text-zinc-950'
@@ -306,7 +343,10 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 							</button>
 							<button
 								type="button"
-								onClick={() => setModeFilter('word')}
+								onClick={() => {
+									setModeFilter('word');
+									setPage(1);
+								}}
 								className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
 									modeFilter === 'word'
 										? 'bg-emerald-500 text-zinc-950'
@@ -317,7 +357,10 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 							</button>
 							<button
 								type="button"
-								onClick={() => setModeFilter('phrase')}
+								onClick={() => {
+									setModeFilter('phrase');
+									setPage(1);
+								}}
 								className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
 									modeFilter === 'phrase'
 										? 'bg-amber-400 text-zinc-950'
@@ -335,7 +378,10 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 							<Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
 							<Input
 								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
+								onChange={(e) => {
+									setSearchQuery(e.target.value);
+									setPage(1);
+								}}
 								placeholder="Buscar por fecha (2026-11...), palabra o pista..."
 								className="pl-8 h-8 text-xs bg-zinc-900 border-zinc-800 text-zinc-200 placeholder:text-zinc-500"
 							/>
@@ -346,49 +392,147 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 						<p className="text-xs text-zinc-400 bg-zinc-900/70 border border-zinc-800 rounded-xl p-4 text-center">
 							No hay días programados todavía. Usa el formulario de arriba para cargar la semana.
 						</p>
-					) : filteredItems.length === 0 ? (
+					) : paginatedDays.length === 0 ? (
 						<p className="text-xs text-zinc-400 bg-zinc-900/70 border border-zinc-800 rounded-xl p-4 text-center">
 							No hay elementos que coincidan con ese filtro.
 						</p>
 					) : (
-						<div className="space-y-2">
-							{filteredItems.map((item) => (
-								<div
-									key={item.id}
-									className="flex items-center justify-between gap-3 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl px-3.5 py-2.5 transition-colors"
-								>
-									<div className="space-y-0.5 min-w-0">
-										<div className="flex items-center gap-2">
-											<span className="text-xs font-mono font-semibold text-zinc-300">
-												{item.dateStr}
-											</span>
-											<span
-												className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
-													item.mode === 'word'
-														? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-														: 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
+						<>
+							<div className="space-y-2.5">
+								{paginatedDays.map((day) => {
+									const isToday = day.dateStr === schedule.today;
+									return (
+										<div
+											key={day.dateStr}
+											className={`bg-zinc-900 border rounded-xl p-3 space-y-2 transition-colors ${
+												isToday ? 'border-emerald-500/50' : 'border-zinc-800'
+											}`}
+										>
+											{/* Cabecera del día */}
+											<div className="flex items-center justify-between border-b border-zinc-800/80 pb-1.5">
+												<div className="flex items-center gap-2">
+													<span className="text-xs font-mono font-bold text-zinc-200">
+														{day.dateStr}
+													</span>
+													{isToday && (
+														<span className="text-[10px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300">
+															Hoy
+														</span>
+													)}
+												</div>
+												<span className="text-[11px] text-zinc-500">
+													{[day.word && 'Palabra', day.phrase && 'Frase']
+														.filter(Boolean)
+														.join(' + ')}
+												</span>
+											</div>
+
+											{/* Retos del día en 2 columnas en desktop / apilados compactos en móvil */}
+											<div
+												className={`grid gap-2 ${
+													modeFilter === 'all' ? 'sm:grid-cols-2' : 'grid-cols-1'
 												}`}
 											>
-												{item.mode === 'word' ? 'Palabra' : 'Frase'}
-											</span>
-										</div>
-										<p className="text-sm font-bold tracking-wide text-zinc-100 break-words">
-											{item.word}
-										</p>
-										{item.hint && <p className="text-xs text-zinc-400">Pista: {item.hint}</p>}
-									</div>
+												{modeFilter !== 'phrase' && (
+													<div className="bg-zinc-950/70 border border-zinc-800/80 rounded-lg px-2.5 py-2 flex items-start justify-between gap-2">
+														{day.word ? (
+															<>
+																<div className="min-w-0 space-y-0.5">
+																	<span className="inline-block text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300">
+																		Palabra
+																	</span>
+																	<p className="text-xs font-bold text-zinc-100 break-words">
+																		{day.word.word}
+																	</p>
+																	{day.word.hint && (
+																		<p className="text-[11px] text-zinc-400 line-clamp-1">
+																			{day.word.hint}
+																		</p>
+																	)}
+																</div>
+																<button
+																	type="button"
+																	onClick={() => handleDelete(day.word!.id)}
+																	title="Eliminar palabra"
+																	className="p-1 text-zinc-500 hover:text-rose-400 rounded cursor-pointer shrink-0"
+																>
+																	<Trash2 className="w-3.5 h-3.5" />
+																</button>
+															</>
+														) : (
+															<span className="text-[11px] text-zinc-500 italic py-1">
+																Sin palabra (usará respaldo)
+															</span>
+														)}
+													</div>
+												)}
 
-									<Button
-										variant="ghost"
-										size="icon"
-										onClick={() => handleDelete(item.id)}
-										className="shrink-0 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer"
+												{modeFilter !== 'word' && (
+													<div className="bg-zinc-950/70 border border-zinc-800/80 rounded-lg px-2.5 py-2 flex items-start justify-between gap-2">
+														{day.phrase ? (
+															<>
+																<div className="min-w-0 space-y-0.5">
+																	<span className="inline-block text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300">
+																		Frase
+																	</span>
+																	<p className="text-xs font-bold text-zinc-100 break-words">
+																		{day.phrase.word}
+																	</p>
+																	{day.phrase.hint && (
+																		<p className="text-[11px] text-zinc-400 line-clamp-1">
+																			{day.phrase.hint}
+																		</p>
+																	)}
+																</div>
+																<button
+																	type="button"
+																	onClick={() => handleDelete(day.phrase!.id)}
+																	title="Eliminar frase"
+																	className="p-1 text-zinc-500 hover:text-rose-400 rounded cursor-pointer shrink-0"
+																>
+																	<Trash2 className="w-3.5 h-3.5" />
+																</button>
+															</>
+														) : (
+															<span className="text-[11px] text-zinc-500 italic py-1">
+																Sin frase (usará respaldo)
+															</span>
+														)}
+													</div>
+												)}
+											</div>
+										</div>
+									);
+								})}
+							</div>
+
+							{/* Controles de paginación */}
+							{totalPages > 1 && (
+								<div className="flex items-center justify-between pt-1">
+									<button
+										type="button"
+										disabled={safePage <= 1}
+										onClick={() => setPage((p) => Math.max(1, p - 1))}
+										className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-bold text-zinc-300 hover:bg-zinc-800 disabled:opacity-40 cursor-pointer"
 									>
-										<Trash2 className="w-4 h-4" />
-									</Button>
+										<ChevronLeft className="w-3.5 h-3.5" />
+										Anterior
+									</button>
+									<span className="text-xs font-semibold text-zinc-400">
+										Página {safePage} de {totalPages}
+									</span>
+									<button
+										type="button"
+										disabled={safePage >= totalPages}
+										onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+										className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-bold text-zinc-300 hover:bg-zinc-800 disabled:opacity-40 cursor-pointer"
+									>
+										Siguiente
+										<ChevronRight className="w-3.5 h-3.5" />
+									</button>
 								</div>
-							))}
-						</div>
+							)}
+						</>
 					)}
 				</div>
 			</div>
