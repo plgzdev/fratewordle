@@ -1217,7 +1217,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 											className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 active:translate-y-0.5 text-amber-950 font-black text-xs uppercase tracking-wider shadow-md border-2 border-b-4 border-amber-600 transition-all cursor-pointer"
 										>
 											<Sparkles className="w-4 h-4 stroke-[2.5] text-amber-900" />
-											Resolver frase completa
+											¿Ya sabes la frase? Adivina aquí
 										</button>
 									</div>
 								)}
