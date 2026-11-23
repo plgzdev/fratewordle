@@ -369,6 +369,8 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				evaluations: data.wordState.evaluations,
 				won: data.wordState.status === 'won',
 				score: data.wordState.score,
+				playerName: data.user?.name,
+				streak: data.user?.currentStreak,
 				appUrl
 			});
 		}
@@ -379,6 +381,8 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				wrongCount: data.phraseState.wrongLetters.length,
 				won: data.phraseState.status === 'won',
 				score: data.phraseState.score,
+				playerName: data.user?.name,
+				streak: data.user?.currentStreak,
 				appUrl
 			});
 		}
