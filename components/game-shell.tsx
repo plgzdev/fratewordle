@@ -33,9 +33,7 @@ import {
 	LogOut,
 	Mail,
 	Pencil,
-	SendHorizontal,
 	Share2,
-	Sparkles,
 	Star,
 	Trophy,
 	User,
@@ -1032,13 +1030,15 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				</DialogContent>
 			</Dialog>
 
-			{/* Modal para Resolver Frase Completa */}
+			{/* Modal para Escribir Frase Completa */}
 			<Dialog open={solveOpen} onOpenChange={setSolveOpen}>
 				<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] w-[calc(100%-1.5rem)] max-w-sm rounded-2xl">
 					<DialogHeader>
-						<DialogTitle className="flex items-center gap-2 text-amber-800 font-black text-sm sm:text-base">
-							<Sparkles className="w-5 h-5 text-amber-500 fill-amber-400 shrink-0" />
-							Resolver la frase completa
+						<DialogTitle className="flex items-center gap-2 text-emerald-700 font-black text-sm sm:text-base">
+							<span className="w-7 h-7 rounded-lg bg-emerald-500 border-b-2 border-emerald-700 text-white flex items-center justify-center shrink-0">
+								<Pencil className="w-3.5 h-3.5 stroke-[2.5]" />
+							</span>
+							Escribir frase completa
 						</DialogTitle>
 					</DialogHeader>
 					<form onSubmit={handleSolvePhraseSubmit} className="space-y-3 pt-1">
@@ -1050,12 +1050,12 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 							onChange={(e) => setSolveInput(e.target.value)}
 							placeholder="Escribe la frase completa..."
 							autoFocus
-							className="bg-[#fdf8ee] border-2 border-stone-300 focus-visible:ring-amber-400 uppercase font-bold text-[#292524]"
+							className="bg-[#fdf8ee] border-2 border-stone-300 focus-visible:ring-emerald-500 uppercase font-bold text-[#292524]"
 						/>
 						<button
 							type="submit"
-							disabled={submitting}
-							className="w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 active:translate-y-0.5 border-2 border-b-4 border-amber-600 text-amber-950 font-black text-sm tracking-wide transition-all disabled:opacity-50 cursor-pointer"
+							disabled={submitting || !solveInput.trim()}
+							className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-emerald-700 text-white font-black text-sm tracking-wide transition-all disabled:opacity-50 cursor-pointer"
 						>
 							{submitting ? 'Comprobando...' : 'Comprobar frase'}
 						</button>
