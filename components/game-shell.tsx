@@ -33,6 +33,7 @@ import {
 	LogOut,
 	Mail,
 	Pencil,
+	SendHorizontal,
 	Share2,
 	Sparkles,
 	Star,
@@ -1216,10 +1217,10 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 										<button
 											type="button"
 											onClick={() => setSolveOpen(true)}
-											className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 active:translate-y-0.5 text-amber-950 font-black text-xs uppercase tracking-wider shadow-md border-2 border-b-4 border-amber-600 transition-all cursor-pointer"
+											className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 active:border-b-2 text-white font-black text-xs sm:text-sm uppercase tracking-wider shadow-sm border-2 border-b-4 border-emerald-700 transition-all cursor-pointer select-none"
 										>
-											<Sparkles className="w-4 h-4 stroke-[2.5] text-amber-900" />
-											Resolver frase completa
+											<Pencil className="w-4 h-4 stroke-[2.75] text-white" />
+											Escribir frase completa
 										</button>
 									</div>
 								)}
