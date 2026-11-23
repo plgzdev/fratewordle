@@ -26,12 +26,14 @@ import {
 import {
 	Award,
 	CheckCircle2,
+	Copy,
 	Flame,
 	KeyRound,
 	Lock,
 	LogIn,
 	LogOut,
 	Mail,
+	MessageCircle,
 	Pencil,
 	Share2,
 	Star,
@@ -358,20 +360,21 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 		solveOpen
 	]);
 
-	async function handleShare(mode: 'word' | 'phrase') {
+	function getShareText(mode: 'word' | 'phrase') {
 		const appUrl = typeof window !== 'undefined' ? window.location.origin : '';
-		let text = '';
 
 		if (mode === 'word' && data.wordState) {
-			text = buildWordShareText({
+			return buildWordShareText({
 				dayNumber: data.wordState.id,
 				evaluations: data.wordState.evaluations,
 				won: data.wordState.status === 'won',
 				score: data.wordState.score,
 				appUrl
 			});
-		} else if (mode === 'phrase' && data.phraseState) {
-			text = buildPhraseShareText({
+		}
+
+		if (mode === 'phrase' && data.phraseState) {
+			return buildPhraseShareText({
 				dayNumber: data.phraseState.id,
 				wrongCount: data.phraseState.wrongLetters.length,
 				won: data.phraseState.status === 'won',
@@ -380,20 +383,29 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 			});
 		}
 
-		if (!text) return;
+		return '';
+	}
 
-		if (navigator.share) {
-			try {
-				await navigator.share({ text });
-				return;
-			} catch {
-				// Fallback a portapapeles
-			}
-		}
+	async function handleCopyShare(mode: 'word' | 'phrase') {
+		const text = getShareText(mode);
+		if (!text) return;
 
 		await navigator.clipboard.writeText(text);
 		setCopied(true);
+		showToast('¡Copiado al portapapeles!');
 		setTimeout(() => setCopied(false), 2000);
+	}
+
+	function handleWhatsAppShare(mode: 'word' | 'phrase', target: 'group' | 'status') {
+		const text = getShareText(mode);
+		if (!text) return;
+
+		if (target === 'status') {
+			showToast('Selecciona "Mi estado" en WhatsApp');
+		}
+
+		const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+		window.open(waUrl, '_blank', 'noopener,noreferrer');
 	}
 
 	async function handleSaveName(e: React.FormEvent) {
@@ -1176,14 +1188,37 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 											Inicia sesión para entrar al Ranking
 										</button>
 									)}
-									<button
-										type="button"
-										onClick={() => handleShare('word')}
-										className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 border-2 border-b-4 border-emerald-700 text-white font-black text-sm flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
-									>
-										<Share2 className="w-4 h-4" />
-										{copied ? '¡Copiado para WhatsApp!' : 'Compartir resultado'}
-									</button>
+
+									<div className="space-y-2 pt-1">
+										<button
+											type="button"
+											onClick={() => handleWhatsAppShare('word', 'group')}
+											className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-emerald-700 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+										>
+											<MessageCircle className="w-4 h-4 shrink-0" />
+											Compartir en grupo WhatsApp
+										</button>
+
+										<div className="grid grid-cols-2 gap-2">
+											<button
+												type="button"
+												onClick={() => handleWhatsAppShare('word', 'status')}
+												className="py-2.5 px-2 rounded-xl bg-amber-400 hover:bg-amber-300 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-amber-600 text-amber-950 font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+											>
+												<Share2 className="w-3.5 h-3.5 shrink-0" />
+												<span>Estado WhatsApp</span>
+											</button>
+
+											<button
+												type="button"
+												onClick={() => handleCopyShare('word')}
+												className="py-2.5 px-2 rounded-xl bg-[#fffdf9] hover:bg-stone-100 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-stone-300 text-stone-700 font-extrabold text-[11px] sm:text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+											>
+												<Copy className="w-3.5 h-3.5 shrink-0" />
+												<span>{copied ? '¡Copiado!' : 'Copiar en portapapeles'}</span>
+											</button>
+										</div>
+									</div>
 								</div>
 							) : (
 								<Keyboard
@@ -1248,14 +1283,37 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 											Inicia sesión para entrar al Ranking
 										</button>
 									)}
-									<button
-										type="button"
-										onClick={() => handleShare('phrase')}
-										className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 border-2 border-b-4 border-emerald-700 text-white font-black text-sm flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
-									>
-										<Share2 className="w-4 h-4" />
-										{copied ? '¡Copiado para WhatsApp!' : 'Compartir resultado'}
-									</button>
+
+									<div className="space-y-2 pt-1">
+										<button
+											type="button"
+											onClick={() => handleWhatsAppShare('phrase', 'group')}
+											className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-emerald-700 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+										>
+											<MessageCircle className="w-4 h-4 shrink-0" />
+											Compartir en grupo WhatsApp
+										</button>
+
+										<div className="grid grid-cols-2 gap-2">
+											<button
+												type="button"
+												onClick={() => handleWhatsAppShare('phrase', 'status')}
+												className="py-2.5 px-2 rounded-xl bg-amber-400 hover:bg-amber-300 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-amber-600 text-amber-950 font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+											>
+												<Share2 className="w-3.5 h-3.5 shrink-0" />
+												<span>Estado WhatsApp</span>
+											</button>
+
+											<button
+												type="button"
+												onClick={() => handleCopyShare('phrase')}
+												className="py-2.5 px-2 rounded-xl bg-[#fffdf9] hover:bg-stone-100 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-stone-300 text-stone-700 font-extrabold text-[11px] sm:text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+											>
+												<Copy className="w-3.5 h-3.5 shrink-0" />
+												<span>{copied ? '¡Copiado!' : 'Copiar en portapapeles'}</span>
+											</button>
+										</div>
+									</div>
 								</div>
 							) : (
 								<Keyboard
