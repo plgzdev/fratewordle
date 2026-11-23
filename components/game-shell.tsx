@@ -76,7 +76,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 	const [passError, setPassError] = useState<string | null>(null);
 	const [passSuccess, setPassSuccess] = useState<string | null>(null);
 
-	// Modal dedicado para recuperar contraseña por OTP (como en el inicio de sesión)
+	// Modal dedicado para recuperar contraseña por OTP
 	const [recoverOpen, setRecoverOpen] = useState(false);
 	const [recoverOtp, setRecoverOtp] = useState('');
 	const [recoverNewPassword, setRecoverNewPassword] = useState('');
@@ -486,7 +486,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 		}
 	}
 
-	// Abre el modal dedicado de recuperar contraseña (igual al de inicio de sesión)
+	// Abre el modal dedicado de recuperar contraseña
 	async function handleOpenRecoverModal() {
 		if (!data.user?.email || sendingRecoverOtp) return;
 		setPassError(null);
@@ -610,24 +610,26 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 								>
 									<UserPen className="w-4 h-4" />
 								</DialogTrigger>
-								<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] w-[calc(100%-2rem)] max-w-[360px] rounded-2xl p-4 sm:p-5 max-h-[90dvh] overflow-y-auto">
-									<DialogHeader>
-										<DialogTitle className="flex items-center gap-2 font-black text-base">
-											<span className="w-7 h-7 rounded-lg bg-emerald-500 border-b-2 border-emerald-700 text-white text-xs font-black flex items-center justify-center">
+								<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] w-[calc(100%-1.5rem)] max-w-[360px] rounded-2xl p-3.5 sm:p-5 max-h-[90dvh] overflow-y-auto overflow-x-hidden">
+									<DialogHeader className="pr-6 text-left">
+										<DialogTitle className="flex items-center gap-2 font-black text-sm sm:text-base min-w-0">
+											<span className="w-7 h-7 shrink-0 rounded-lg bg-emerald-500 border-b-2 border-emerald-700 text-white text-xs font-black flex items-center justify-center">
 												{data.user.name.charAt(0).toUpperCase()}
 											</span>
-											Mi Perfil del Squad
+											<span className="truncate">Mi Perfil del Squad</span>
 										</DialogTitle>
 									</DialogHeader>
 
-									<div className="space-y-4 pt-1">
+									<div className="space-y-3.5 pt-1 min-w-0">
 										{/* Correo de la cuenta con opción de editar */}
-										<div className="space-y-2">
+										<div className="space-y-2 min-w-0">
 											{!editingEmail ? (
-												<div className="flex items-center justify-between gap-2 bg-[#fdf8ee] border border-[#e6d8c3] rounded-xl px-3 py-2 text-xs text-stone-600">
-													<div className="flex items-center gap-2 min-w-0">
+												<div className="flex items-center justify-between gap-2 bg-[#fdf8ee] border border-[#e6d8c3] rounded-xl px-2.5 py-2 text-xs text-stone-600 min-w-0">
+													<div className="flex items-center gap-1.5 min-w-0 flex-1">
 														<Mail className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-														<span className="truncate font-medium">{data.user.email}</span>
+														<span className="truncate font-medium block">
+															{data.user.email}
+														</span>
 													</div>
 													<button
 														type="button"
@@ -640,17 +642,17 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 														className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 shrink-0 cursor-pointer"
 													>
 														<Pencil className="w-3 h-3" />
-														Cambiar
+														<span>Cambiar</span>
 													</button>
 												</div>
 											) : (
 												<form
 													onSubmit={handleChangeEmail}
-													className="bg-[#fdf8ee] border border-[#e6d8c3] rounded-xl p-2.5 space-y-2"
+													className="bg-[#fdf8ee] border border-[#e6d8c3] rounded-xl p-2.5 space-y-2 min-w-0"
 												>
-													<div className="flex items-center justify-between">
-														<span className="text-[11px] font-bold text-stone-600">
-															Nuevo correo electrónico
+													<div className="flex items-center justify-between gap-2">
+														<span className="text-[11px] font-bold text-stone-600 truncate">
+															Nuevo correo
 														</span>
 														<button
 															type="button"
@@ -658,24 +660,24 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 																setEditingEmail(false);
 																setEmailError(null);
 															}}
-															className="text-[11px] font-bold text-stone-400 hover:text-stone-700 cursor-pointer"
+															className="text-[11px] font-bold text-stone-400 hover:text-stone-700 shrink-0 cursor-pointer"
 														>
 															Cancelar
 														</button>
 													</div>
-													<div className="flex gap-1.5">
+													<div className="flex gap-1.5 min-w-0">
 														<Input
 															type="email"
 															required
 															value={newEmailInput}
 															onChange={(e) => setNewEmailInput(e.target.value)}
 															placeholder="nuevo@correo.com"
-															className="bg-white border-stone-300 text-[#292524] h-8 text-xs"
+															className="bg-white border-stone-300 text-[#292524] h-8 text-xs min-w-0 flex-1"
 														/>
 														<button
 															type="submit"
 															disabled={savingEmail || !newEmailInput.trim()}
-															className="px-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 border-b-2 border-emerald-700 text-white font-black text-xs disabled:opacity-40 cursor-pointer shrink-0"
+															className="px-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 border-b-2 border-emerald-700 text-white font-black text-xs disabled:opacity-40 cursor-pointer shrink-0"
 														>
 															{savingEmail ? '...' : 'Enviar'}
 														</button>
@@ -684,74 +686,74 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 											)}
 
 											{emailError && (
-												<p className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5">
+												<p className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5 break-words">
 													{emailError}
 												</p>
 											)}
 
 											{emailSuccess && (
-												<p className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
+												<p className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5 break-words">
 													{emailSuccess}
 												</p>
 											)}
 										</div>
 
 										{/* Estadísticas del jugador */}
-										<div className="grid grid-cols-2 gap-2">
-											<div className="bg-[#fdf8ee] border-2 border-b-4 border-[#e6d8c3] rounded-xl p-2.5 flex items-center gap-2.5">
-												<div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
-													<Flame className="w-4 h-4 fill-orange-500" />
+										<div className="grid grid-cols-2 gap-1.5 sm:gap-2 min-w-0">
+											<div className="bg-[#fdf8ee] border-2 border-b-4 border-[#e6d8c3] rounded-xl p-2 sm:p-2.5 flex items-center gap-2 min-w-0">
+												<div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+													<Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-orange-500" />
 												</div>
-												<div>
-													<p className="text-sm font-black leading-tight text-[#292524]">
+												<div className="min-w-0">
+													<p className="text-xs sm:text-sm font-black leading-tight text-[#292524] truncate">
 														{data.user.currentStreak}
 													</p>
-													<p className="text-[11px] font-semibold text-stone-500">
+													<p className="text-[10px] sm:text-[11px] font-semibold text-stone-500 leading-tight">
 														Racha actual
 													</p>
 												</div>
 											</div>
 
-											<div className="bg-[#fdf8ee] border-2 border-b-4 border-[#e6d8c3] rounded-xl p-2.5 flex items-center gap-2.5">
-												<div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
-													<Award className="w-4 h-4" />
+											<div className="bg-[#fdf8ee] border-2 border-b-4 border-[#e6d8c3] rounded-xl p-2 sm:p-2.5 flex items-center gap-2 min-w-0">
+												<div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+													<Award className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
 												</div>
-												<div>
-													<p className="text-sm font-black leading-tight text-[#292524]">
+												<div className="min-w-0">
+													<p className="text-xs sm:text-sm font-black leading-tight text-[#292524] truncate">
 														{data.user.maxStreak}
 													</p>
-													<p className="text-[11px] font-semibold text-stone-500">
+													<p className="text-[10px] sm:text-[11px] font-semibold text-stone-500 leading-tight">
 														Mejor racha
 													</p>
 												</div>
 											</div>
 
-											<div className="bg-[#fdf8ee] border-2 border-b-4 border-[#e6d8c3] rounded-xl p-2.5 flex items-center gap-2.5">
-												<div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-													<Star className="w-4 h-4 fill-emerald-500" />
+											<div className="bg-[#fdf8ee] border-2 border-b-4 border-[#e6d8c3] rounded-xl p-2 sm:p-2.5 flex items-center gap-2 min-w-0">
+												<div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+													<Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-emerald-500" />
 												</div>
-												<div>
-													<p className="text-sm font-black leading-tight text-[#292524]">
+												<div className="min-w-0">
+													<p className="text-xs sm:text-sm font-black leading-tight text-[#292524] truncate">
 														{data.user.totalPoints}
 													</p>
-													<p className="text-[11px] font-semibold text-stone-500">
+													<p className="text-[10px] sm:text-[11px] font-semibold text-stone-500 leading-tight">
 														Puntos totales
 													</p>
 												</div>
 											</div>
 
-											<div className="bg-[#fdf8ee] border-2 border-b-4 border-[#e6d8c3] rounded-xl p-2.5 flex items-center gap-2.5">
-												<div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
-													<CheckCircle2 className="w-4 h-4" />
+											<div className="bg-[#fdf8ee] border-2 border-b-4 border-[#e6d8c3] rounded-xl p-2 sm:p-2.5 flex items-center gap-2 min-w-0">
+												<div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
+													<CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
 												</div>
-												<div>
-													<p className="text-sm font-black leading-tight text-[#292524]">
+												<div className="min-w-0">
+													<p className="text-xs sm:text-sm font-black leading-tight text-[#292524] truncate">
 														{data.user.gamesWon}{' '}
-														<span className="text-xs font-semibold text-stone-400">
+														<span className="text-[10px] sm:text-xs font-semibold text-stone-400">
 															/ {data.user.gamesPlayed}
 														</span>
 													</p>
-													<p className="text-[11px] font-semibold text-stone-500">
+													<p className="text-[10px] sm:text-[11px] font-semibold text-stone-500 leading-tight">
 														Ganadas
 													</p>
 												</div>
@@ -761,19 +763,19 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 										{/* Editar Apodo */}
 										<form
 											onSubmit={handleSaveName}
-											className="space-y-2 pt-2 border-t border-[#e6d8c3]"
+											className="space-y-2 pt-2 border-t border-[#e6d8c3] min-w-0"
 										>
 											<label className="text-xs font-bold text-stone-600 flex items-center gap-1.5">
-												<User className="w-3.5 h-3.5 text-stone-400" />
-												Apodo en el Ranking
+												<User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+												<span>Apodo en el Ranking</span>
 											</label>
-											<div className="flex gap-2">
+											<div className="flex gap-1.5 min-w-0">
 												<Input
 													value={nameInput}
 													onChange={(e) => setNameInput(e.target.value)}
 													maxLength={24}
 													placeholder="Tu apodo"
-													className="bg-[#fdf8ee] border-stone-300 text-[#292524] h-9 text-sm"
+													className="bg-[#fdf8ee] border-stone-300 text-[#292524] h-9 text-xs sm:text-sm min-w-0 flex-1"
 												/>
 												<button
 													type="submit"
@@ -782,7 +784,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 														nameInput.trim().length < 2 ||
 														nameInput.trim() === data.user.name
 													}
-													className="px-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 border-2 border-b-4 border-emerald-700 text-white font-black text-xs transition-all disabled:opacity-40 cursor-pointer shrink-0"
+													className="px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 border-2 border-b-4 border-emerald-700 text-white font-black text-xs transition-all disabled:opacity-40 cursor-pointer shrink-0"
 												>
 													{savingName ? '...' : 'Guardar'}
 												</button>
@@ -790,7 +792,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 										</form>
 
 										{/* Sección Cambiar Contraseña */}
-										<div className="pt-2 border-t border-[#e6d8c3]">
+										<div className="pt-2 border-t border-[#e6d8c3] min-w-0">
 											{!showPasswordForm ? (
 												<button
 													type="button"
@@ -801,15 +803,15 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 													}}
 													className="w-full py-2 px-3 rounded-xl bg-[#f7eedb] hover:bg-amber-100/70 border border-[#e6d8c3] text-stone-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
 												>
-													<KeyRound className="w-3.5 h-3.5 text-amber-600" />
-													Cambiar contraseña
+													<KeyRound className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+													<span>Cambiar contraseña</span>
 												</button>
 											) : (
-												<form onSubmit={handleChangePassword} className="space-y-2.5">
-													<div className="flex items-center justify-between">
-														<span className="text-xs font-bold text-stone-600 flex items-center gap-1.5">
-															<Lock className="w-3.5 h-3.5 text-stone-400" />
-															Cambiar contraseña
+												<form onSubmit={handleChangePassword} className="space-y-2.5 min-w-0">
+													<div className="flex items-center justify-between gap-2">
+														<span className="text-xs font-bold text-stone-600 flex items-center gap-1.5 truncate">
+															<Lock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+															<span className="truncate">Cambiar contraseña</span>
 														</span>
 														<button
 															type="button"
@@ -820,7 +822,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 																setCurrentPassword('');
 																setNewPassword('');
 															}}
-															className="text-[11px] font-bold text-stone-400 hover:text-stone-700 cursor-pointer"
+															className="text-[11px] font-bold text-stone-400 hover:text-stone-700 shrink-0 cursor-pointer"
 														>
 															Cancelar
 														</button>
@@ -840,7 +842,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 														minLength={6}
 														value={newPassword}
 														onChange={(e) => setNewPassword(e.target.value)}
-														placeholder="Nueva contraseña (mín. 6 caracteres)"
+														placeholder="Nueva contraseña (mín. 6)"
 														className="bg-[#fdf8ee] border-stone-300 text-[#292524] h-9 text-xs"
 													/>
 
@@ -849,22 +851,22 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 															type="button"
 															disabled={sendingRecoverOtp}
 															onClick={handleOpenRecoverModal}
-															className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer disabled:opacity-50"
+															className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 text-right cursor-pointer disabled:opacity-50"
 														>
 															{sendingRecoverOtp
 																? 'Enviando código...'
-																: '¿Olvidaste tu contraseña? Recuperar por correo'}
+																: '¿La olvidaste? Recuperar por correo'}
 														</button>
 													</div>
 
 													{passError && (
-														<p className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5">
+														<p className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5 break-words">
 															{passError}
 														</p>
 													)}
 
 													{passSuccess && (
-														<p className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
+														<p className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5 break-words">
 															{passSuccess}
 														</p>
 													)}
@@ -905,7 +907,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				</div>
 			</header>
 
-			{/* Modal independiente de Recuperar Contraseña (mismo diseño que AuthScreen) */}
+			{/* Modal independiente de Recuperar Contraseña */}
 			<Dialog
 				open={recoverOpen}
 				onOpenChange={(open) => {
@@ -918,17 +920,17 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 					}
 				}}
 			>
-				<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] w-[calc(100%-2rem)] max-w-[340px] rounded-2xl p-0 overflow-hidden">
+				<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] w-[calc(100%-1.5rem)] max-w-[340px] rounded-2xl p-0 overflow-hidden">
 					<DialogHeader className="sr-only">
 						<DialogTitle>Recuperar contraseña</DialogTitle>
 					</DialogHeader>
-					<div className="p-4 sm:p-5 space-y-3.5 bg-[#fffdf9] text-[#292524]">
+					<div className="p-4 sm:p-5 space-y-3.5 bg-[#fffdf9] text-[#292524] min-w-0">
 						<div className="text-center space-y-1">
 							<div className="w-10 h-10 mx-auto rounded-2xl bg-amber-400 border-2 border-b-4 border-amber-600 text-amber-950 font-black flex items-center justify-center shadow-xs">
 								<KeyRound className="w-5 h-5" />
 							</div>
 							<h2 className="text-base font-black tracking-tight pt-1">Nueva contraseña</h2>
-							<p className="text-xs text-stone-500">
+							<p className="text-xs text-stone-500 break-all">
 								Código enviado a{' '}
 								<span className="font-bold text-[#292524]">{data.user?.email}</span>
 							</p>
@@ -946,7 +948,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 									value={recoverOtp}
 									onChange={(e) => setRecoverOtp(e.target.value.replace(/\D/g, ''))}
 									placeholder="000000"
-									className="text-center text-lg font-black tracking-[0.35em] bg-[#fdf8ee] border-stone-300 text-[#292524] h-11"
+									className="text-center text-lg font-black tracking-[0.25em] sm:tracking-[0.35em] bg-[#fdf8ee] border-stone-300 text-[#292524] h-11"
 								/>
 							</div>
 
@@ -967,13 +969,13 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 							</div>
 
 							{recoverInfo && (
-								<p className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+								<p className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 break-words">
 									{recoverInfo}
 								</p>
 							)}
 
 							{recoverError && (
-								<p className="text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+								<p className="text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 break-words">
 									{recoverError}
 								</p>
 							)}
@@ -988,7 +990,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 								{recoverLoading ? 'Guardando...' : 'Guardar nueva contraseña'}
 							</button>
 
-							<div className="flex items-center justify-between pt-1 text-xs">
+							<div className="flex items-center justify-between gap-2 pt-1 text-xs">
 								<button
 									type="button"
 									onClick={() => {
@@ -997,7 +999,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 									}}
 									className="font-bold text-stone-500 hover:text-stone-800 cursor-pointer"
 								>
-									← Volver al perfil
+									← Volver
 								</button>
 								<button
 									type="button"
@@ -1015,7 +1017,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 
 			{/* Modal de Login Opcional */}
 			<Dialog open={authOpen} onOpenChange={setAuthOpen}>
-				<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] w-[calc(100%-2rem)] max-w-[340px] rounded-2xl p-0 overflow-hidden">
+				<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] w-[calc(100%-1.5rem)] max-w-[340px] rounded-2xl p-0 overflow-hidden">
 					<DialogHeader className="sr-only">
 						<DialogTitle>Iniciar sesión en FrateWordleSquad</DialogTitle>
 					</DialogHeader>
@@ -1031,10 +1033,10 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 
 			{/* Modal para Resolver Frase Completa */}
 			<Dialog open={solveOpen} onOpenChange={setSolveOpen}>
-				<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] max-w-sm">
+				<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] w-[calc(100%-1.5rem)] max-w-sm rounded-2xl">
 					<DialogHeader>
-						<DialogTitle className="flex items-center gap-2 text-amber-800 font-black">
-							<Sparkles className="w-5 h-5 text-amber-500 fill-amber-400" />
+						<DialogTitle className="flex items-center gap-2 text-amber-800 font-black text-sm sm:text-base">
+							<Sparkles className="w-5 h-5 text-amber-500 fill-amber-400 shrink-0" />
 							Resolver la frase completa
 						</DialogTitle>
 					</DialogHeader>
@@ -1062,7 +1064,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 
 			{/* Modal de confirmación para Cerrar Sesión */}
 			<Dialog open={logoutOpen} onOpenChange={setLogoutOpen}>
-				<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] max-w-xs">
+				<DialogContent className="bg-[#fffdf9] border-2 border-[#e6d8c3] text-[#292524] w-[calc(100%-1.5rem)] max-w-xs rounded-2xl">
 					<DialogHeader>
 						<DialogTitle className="font-black text-base">¿Cerrar sesión?</DialogTitle>
 					</DialogHeader>
@@ -1217,7 +1219,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 											className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 active:translate-y-0.5 text-amber-950 font-black text-xs uppercase tracking-wider shadow-md border-2 border-b-4 border-amber-600 transition-all cursor-pointer"
 										>
 											<Sparkles className="w-4 h-4 stroke-[2.5] text-amber-900" />
-											¿Ya sabes la frase? Adivina aquí
+											Resolver frase completa
 										</button>
 									</div>
 								)}
