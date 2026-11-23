@@ -125,7 +125,7 @@ export function PhraseBoard({ maskedChars, wrongLetters, hint }: PhraseBoardProp
 							key={`${wl}-${i}`}
 							className="px-2 py-0.5 text-xs font-extrabold rounded-md bg-rose-100 border border-rose-300 text-rose-700 animate-tile-pop"
 						>
-							{wl}
+							{wl.replace(/^SOLVE:/i, '')}
 						</span>
 					))}
 				</div>
