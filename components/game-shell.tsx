@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
 	getInitialGameData,
+	getLeaderboardsOnly,
 	solvePhraseGuess,
 	submitPhraseLetter,
 	submitWordGuess,
@@ -102,6 +103,20 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 		}
 	}, []);
 
+	// Refrescar ranking solo al entrar a la pestaña Ranking
+	const handleTabChange = useCallback(
+		(nextTab: string) => {
+			const tab = nextTab as 'word' | 'phrase' | 'ranking';
+			setActiveTab(tab);
+			if (tab === 'ranking') {
+				getLeaderboardsOnly().then((leaderboards) => {
+					setData((prev) => ({ ...prev, leaderboards }));
+				});
+			}
+		},
+		[]
+	);
+
 	// Si juega como invitado, restaurar progreso diario desde localStorage
 	useEffect(() => {
 		if (data.user) return;
@@ -171,7 +186,6 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 			} catch {}
 		}
 
-		// Limpiar llaves vacías si no había jugadas reales
 		if (!wordGuesses && !phraseGuesses) {
 			if (wordDate) localStorage.removeItem(`fws_word_${wordDate}`);
 			if (phraseDate) localStorage.removeItem(`fws_phrase_${phraseDate}`);
@@ -271,13 +285,13 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				};
 
 				setCurrentGuess('');
-				setData((prev) =>
-					prev.wordState ? { ...prev, wordState: { ...prev.wordState, ...updatedState } } : prev
-				);
+				setData((prev) => ({
+					...prev,
+					user: prev.user && res.userStats ? { ...prev.user, ...res.userStats } : prev.user,
+					wordState: prev.wordState ? { ...prev.wordState, ...updatedState } : null
+				}));
 
-				if (data.user) {
-					await refreshData();
-				} else {
+				if (!data.user) {
 					localStorage.setItem(`fws_word_${ws.dateStr}`, JSON.stringify(updatedState));
 				}
 
@@ -290,7 +304,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				setCurrentGuess((prev) => prev + key);
 			}
 		},
-		[currentGuess, data.user, data.wordState, refreshData, showToast, submitting]
+		[currentGuess, data.user, data.wordState, showToast, submitting]
 	);
 
 	const handlePhraseKey = useCallback(
@@ -306,11 +320,11 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 
 			if ('ok' in res && res.ok) {
 				const previousWrongResolutions = ps.wrongLetters.filter((l) => l === '✕').length;
-				const combinedWrongLetters = [
-					...res.wrongLetters,
-					...Array(previousWrongResolutions).fill('✕')
-				];
-				const lostByResolutions = res.status === 'playing' && combinedWrongLetters.length >= 6;
+				const combinedWrongLetters = data.user
+					? res.wrongLetters
+					: [...res.wrongLetters, ...Array(previousWrongResolutions).fill('✕')];
+				const lostByResolutions =
+					!data.user && res.status === 'playing' && combinedWrongLetters.length >= 6;
 				const finalStatus: GameStatus = lostByResolutions
 					? 'lost'
 					: (res.status as GameStatus);
@@ -324,15 +338,13 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 					solution: res.solution
 				};
 
-				setData((prev) =>
-					prev.phraseState
-						? { ...prev, phraseState: { ...prev.phraseState, ...updatedState } }
-						: prev
-				);
+				setData((prev) => ({
+					...prev,
+					user: prev.user && res.userStats ? { ...prev.user, ...res.userStats } : prev.user,
+					phraseState: prev.phraseState ? { ...prev.phraseState, ...updatedState } : null
+				}));
 
-				if (data.user) {
-					refreshData();
-				} else {
+				if (!data.user) {
 					let existingRawGuesses: string[] = [];
 					try {
 						const prevSaved = localStorage.getItem(`fws_phrase_${ps.dateStr}`);
@@ -355,7 +367,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				else if (finalStatus === 'lost') showToast('Sin vidas hoy');
 			}
 		},
-		[data.phraseState, data.user, refreshData, showToast, submitting]
+		[data.phraseState, data.user, showToast, submitting]
 	);
 
 	async function handleSolvePhraseSubmit(e: React.FormEvent) {
@@ -373,9 +385,25 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 			setSolveInput('');
 			setSolveOpen(false);
 
-			if (data.user) {
-				await refreshData();
-			} else {
+			const updatedWrongResolutions = guestWrongResolutions + (res.isCorrect ? 0 : 1);
+			const updatedState = {
+				maskedChars: res.maskedChars,
+				guessedLetters: res.guessedLetters,
+				wrongLetters: data.user
+					? res.wrongLetters
+					: [...res.wrongLetters, ...Array(updatedWrongResolutions).fill('✕')],
+				status: res.status as GameStatus,
+				score: res.score,
+				solution: res.solution
+			};
+
+			setData((prev) => ({
+				...prev,
+				user: prev.user && res.userStats ? { ...prev.user, ...res.userStats } : prev.user,
+				phraseState: prev.phraseState ? { ...prev.phraseState, ...updatedState } : null
+			}));
+
+			if (!data.user) {
 				let existingRawGuesses: string[] = ps.guessedLetters;
 				try {
 					const prevSaved = localStorage.getItem(`fws_phrase_${ps.dateStr}`);
@@ -385,24 +413,12 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 					}
 				} catch {}
 
-				const updatedWrongResolutions = guestWrongResolutions + (res.isCorrect ? 0 : 1);
-				const updatedState = {
-					maskedChars: res.maskedChars,
-					guessedLetters: res.guessedLetters,
-					wrongLetters: [
-						...res.wrongLetters,
-						...Array(updatedWrongResolutions).fill('✕')
-					],
-					rawGuesses: [...existingRawGuesses, `SOLVE:${submittedPhrase}`],
-					status: res.status as GameStatus,
-					score: res.score,
-					solution: res.solution
-				};
-				localStorage.setItem(`fws_phrase_${ps.dateStr}`, JSON.stringify(updatedState));
-				setData((prev) =>
-					prev.phraseState
-						? { ...prev, phraseState: { ...prev.phraseState, ...updatedState } }
-						: prev
+				localStorage.setItem(
+					`fws_phrase_${ps.dateStr}`,
+					JSON.stringify({
+						...updatedState,
+						rawGuesses: [...existingRawGuesses, `SOLVE:${submittedPhrase}`]
+					})
 				);
 			}
 
@@ -508,8 +524,12 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 		setSavingName(true);
 		const res = await updateDisplayName(nameInput);
 		setSavingName(false);
-		if ('ok' in res) {
-			await refreshData();
+		if ('ok' in res && res.ok && typeof res.name === 'string') {
+			const updatedName = res.name;
+			setData((prev) =>
+				prev.user ? { ...prev, user: { ...prev.user, name: updatedName } } : prev
+			);
+			setNameInput(updatedName);
 			showToast('Apodo actualizado');
 		} else {
 			showToast('El apodo debe tener al menos 2 letras');
@@ -591,7 +611,6 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 		}
 	}
 
-	// Abre el modal dedicado de recuperar contraseña
 	async function handleOpenRecoverModal() {
 		if (!data.user?.email || sendingRecoverOtp) return;
 		setPassError(null);
@@ -1210,7 +1229,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 			{/* Contenido principal con pestañas */}
 			<Tabs
 				value={activeTab}
-				onValueChange={(v) => setActiveTab(v as 'word' | 'phrase' | 'ranking')}
+				onValueChange={handleTabChange}
 				className="flex-1 min-h-0 flex flex-col max-w-lg w-full mx-auto"
 			>
 				<div className="px-3 sm:px-4 pt-2 w-full shrink-0">
