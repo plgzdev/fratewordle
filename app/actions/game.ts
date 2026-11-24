@@ -609,6 +609,151 @@ export async function solvePhraseGuess(
 	};
 }
 
+export async function syncGuestProgress(payload: {
+	dateStr?: string;
+	wordGuesses?: string[];
+	phraseGuesses?: string[];
+}) {
+	const session = await auth.api.getSession({ headers: await headers() });
+	if (!session) return { error: 'UNAUTHENTICATED' as const };
+
+	const today = payload.dateStr || getLocalTodayStr();
+	const todaysChallenges = await db
+		.select()
+		.from(dailyWords)
+		.where(eq(dailyWords.dateStr, today));
+
+	const wordDaily = todaysChallenges.find((c) => c.mode === 'word');
+	const phraseDaily = todaysChallenges.find((c) => c.mode === 'phrase');
+	let syncedAny = false;
+
+	// 1. Sincronizar progreso de PALABRA si el usuario aún no tiene intento hoy en BD
+	if (wordDaily && payload.wordGuesses && payload.wordGuesses.length > 0) {
+		const [existingWord] = await db
+			.select()
+			.from(gameAttempts)
+			.where(and(eq(gameAttempts.userId, session.user.id), eq(gameAttempts.wordId, wordDaily.id)));
+
+		if (!existingWord) {
+			const target = normalizeSpanish(wordDaily.word);
+			const validGuesses: string[] = [];
+
+			for (const raw of payload.wordGuesses.slice(0, MAX_ATTEMPTS)) {
+				const g = normalizeSpanish(raw);
+				if (g.length !== target.length) continue;
+				if (g !== target && !isValidSpanishWord(g, target.length)) continue;
+				validGuesses.push(g);
+				if (g === target) break;
+			}
+
+			if (validGuesses.length > 0) {
+				const won = validGuesses[validGuesses.length - 1] === target;
+				const lost = !won && validGuesses.length >= MAX_ATTEMPTS;
+				const status = won ? 'won' : lost ? 'lost' : 'playing';
+				const pointsTable: Record<number, number> = { 1: 100, 2: 85, 3: 70, 4: 55, 5: 40, 6: 25 };
+				const score = won ? (pointsTable[validGuesses.length] ?? 0) : 0;
+
+				await db.insert(gameAttempts).values({
+					userId: session.user.id,
+					wordId: wordDaily.id,
+					guesses: validGuesses,
+					status,
+					score,
+					finishedAt: status !== 'playing' ? new Date() : null
+				});
+				syncedAny = true;
+			}
+		}
+	}
+
+	// 2. Sincronizar progreso de FRASE si el usuario aún no tiene intento hoy en BD
+	if (phraseDaily && payload.phraseGuesses && payload.phraseGuesses.length > 0) {
+		const [existingPhrase] = await db
+			.select()
+			.from(gameAttempts)
+			.where(
+				and(eq(gameAttempts.userId, session.user.id), eq(gameAttempts.wordId, phraseDaily.id))
+			);
+
+		if (!existingPhrase) {
+			const cleanTarget = normalizeSpanish(phraseDaily.word).replace(/\s+/g, ' ').trim();
+			const letterGuesses: string[] = [];
+			const solveGuesses: string[] = [];
+			let solvedCorrectly = false;
+
+			for (const raw of payload.phraseGuesses) {
+				if (raw.startsWith('SOLVE:')) {
+					const attemptPhrase = normalizeSpanish(raw.slice(6)).replace(/\s+/g, ' ').trim();
+					if (!attemptPhrase) continue;
+					if (attemptPhrase === cleanTarget) {
+						solvedCorrectly = true;
+						break;
+					} else {
+						solveGuesses.push(`SOLVE:${attemptPhrase}`);
+					}
+				} else {
+					const letter = normalizeSpanish(raw);
+					if (LETTER_REGEX.test(letter) && !letterGuesses.includes(letter)) {
+						letterGuesses.push(letter);
+					}
+				}
+
+				const wrongLettersCount =
+					letterGuesses.filter((l) => !cleanTarget.includes(l)).length + solveGuesses.length;
+				const allLettersFound = cleanTarget
+					.split('')
+					.filter((c) => LETTER_REGEX.test(c))
+					.every((c) => letterGuesses.includes(c));
+
+				if (allLettersFound || wrongLettersCount >= MAX_ATTEMPTS) break;
+			}
+
+			const storedGuesses = [...letterGuesses, ...solveGuesses];
+			if (storedGuesses.length > 0 || solvedCorrectly) {
+				const wrongLetters = letterGuesses.filter((l) => !cleanTarget.includes(l));
+				const totalMistakes = wrongLetters.length + solveGuesses.length;
+				const allLettersFound = cleanTarget
+					.split('')
+					.filter((c) => LETTER_REGEX.test(c))
+					.every((c) => letterGuesses.includes(c));
+
+				const won = solvedCorrectly || allLettersFound;
+				const lost = !won && totalMistakes >= MAX_ATTEMPTS;
+				const status = won ? 'won' : lost ? 'lost' : 'playing';
+
+				const uniqueTargetLetters = new Set(
+					cleanTarget.split('').filter((c) => LETTER_REGEX.test(c))
+				);
+				const revealedCount = [...uniqueTargetLetters].filter((l) =>
+					letterGuesses.includes(l)
+				).length;
+				const unrevealedBonus = solvedCorrectly
+					? Math.max(0, (uniqueTargetLetters.size - revealedCount) * 5)
+					: 0;
+				const score = won
+					? Math.min(150, Math.max(25, 100 - wrongLetters.length * 15 + unrevealedBonus))
+					: 0;
+
+				await db.insert(gameAttempts).values({
+					userId: session.user.id,
+					wordId: phraseDaily.id,
+					guesses: storedGuesses,
+					status,
+					score,
+					finishedAt: status !== 'playing' ? new Date() : null
+				});
+				syncedAny = true;
+			}
+		}
+	}
+
+	if (syncedAny) {
+		await syncUserDailyStreak(session.user.id, today);
+	}
+
+	return { ok: true as const };
+}
+
 export async function updateDisplayName(newName: string) {
 	const session = await auth.api.getSession({ headers: await headers() });
 	if (!session) return { error: 'UNAUTHENTICATED' as const };

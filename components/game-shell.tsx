@@ -6,6 +6,7 @@ import {
 	solvePhraseGuess,
 	submitPhraseLetter,
 	submitWordGuess,
+	syncGuestProgress,
 	updateDisplayName
 } from '@/app/actions/game';
 import { authClient } from '@/lib/auth-client';
@@ -135,6 +136,70 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 			}
 		}
 	}, [data.user, data.wordState?.dateStr, data.phraseState?.dateStr]);
+
+	// Sincronizar automáticamente cualquier progreso de invitado pendiente al iniciar sesión
+	useEffect(() => {
+		if (!data.user) return;
+
+		const wordDate = data.wordState?.dateStr;
+		const phraseDate = data.phraseState?.dateStr;
+
+		const rawWord = wordDate ? localStorage.getItem(`fws_word_${wordDate}`) : null;
+		const rawPhrase = phraseDate ? localStorage.getItem(`fws_phrase_${phraseDate}`) : null;
+
+		if (!rawWord && !rawPhrase) return;
+
+		let wordGuesses: string[] | undefined;
+		let phraseGuesses: string[] | undefined;
+
+		if (rawWord) {
+			try {
+				const parsed = JSON.parse(rawWord);
+				if (Array.isArray(parsed.guesses) && parsed.guesses.length > 0) {
+					wordGuesses = parsed.guesses;
+				}
+			} catch {}
+		}
+
+		if (rawPhrase) {
+			try {
+				const parsed = JSON.parse(rawPhrase);
+				const list = parsed.rawGuesses ?? parsed.guessedLetters;
+				if (Array.isArray(list) && list.length > 0) {
+					phraseGuesses = list;
+				}
+			} catch {}
+		}
+
+		// Limpiar llaves vacías si no había jugadas reales
+		if (!wordGuesses && !phraseGuesses) {
+			if (wordDate) localStorage.removeItem(`fws_word_${wordDate}`);
+			if (phraseDate) localStorage.removeItem(`fws_phrase_${phraseDate}`);
+			return;
+		}
+
+		let cancelled = false;
+
+		(async () => {
+			showToast('Guardando tu progreso de hoy...');
+			const res = await syncGuestProgress({
+				dateStr: wordDate ?? phraseDate,
+				wordGuesses,
+				phraseGuesses
+			});
+
+			if (!cancelled && res && 'ok' in res) {
+				if (wordDate) localStorage.removeItem(`fws_word_${wordDate}`);
+				if (phraseDate) localStorage.removeItem(`fws_phrase_${phraseDate}`);
+				await refreshData();
+				showToast('¡Progreso guardado en tu cuenta!');
+			}
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [data.user, data.wordState?.dateStr, data.phraseState?.dateStr, refreshData, showToast]);
 
 	// Estados de letras en el teclado para Modo Palabra
 	const wordLetterStatuses = useMemo(() => {
@@ -268,7 +333,22 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 				if (data.user) {
 					refreshData();
 				} else {
-					localStorage.setItem(`fws_phrase_${ps.dateStr}`, JSON.stringify(updatedState));
+					let existingRawGuesses: string[] = [];
+					try {
+						const prevSaved = localStorage.getItem(`fws_phrase_${ps.dateStr}`);
+						if (prevSaved) {
+							const parsed = JSON.parse(prevSaved);
+							existingRawGuesses = parsed.rawGuesses ?? parsed.guessedLetters ?? [];
+						}
+					} catch {}
+
+					localStorage.setItem(
+						`fws_phrase_${ps.dateStr}`,
+						JSON.stringify({
+							...updatedState,
+							rawGuesses: [...existingRawGuesses, key]
+						})
+					);
 				}
 
 				if (finalStatus === 'won') showToast(`¡Frase resuelta! +${res.score} pts`);
@@ -285,7 +365,8 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 
 		setSubmitting(true);
 		const guestWrongResolutions = ps.wrongLetters.filter((l) => l === '✕').length;
-		const res = await solvePhraseGuess(solveInput, ps.guessedLetters, guestWrongResolutions);
+		const submittedPhrase = solveInput.trim();
+		const res = await solvePhraseGuess(submittedPhrase, ps.guessedLetters, guestWrongResolutions);
 		setSubmitting(false);
 
 		if ('ok' in res && res.ok) {
@@ -295,10 +376,24 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 			if (data.user) {
 				await refreshData();
 			} else {
+				let existingRawGuesses: string[] = ps.guessedLetters;
+				try {
+					const prevSaved = localStorage.getItem(`fws_phrase_${ps.dateStr}`);
+					if (prevSaved) {
+						const parsed = JSON.parse(prevSaved);
+						existingRawGuesses = parsed.rawGuesses ?? parsed.guessedLetters ?? ps.guessedLetters;
+					}
+				} catch {}
+
+				const updatedWrongResolutions = guestWrongResolutions + (res.isCorrect ? 0 : 1);
 				const updatedState = {
 					maskedChars: res.maskedChars,
 					guessedLetters: res.guessedLetters,
-					wrongLetters: res.wrongLetters,
+					wrongLetters: [
+						...res.wrongLetters,
+						...Array(updatedWrongResolutions).fill('✕')
+					],
+					rawGuesses: [...existingRawGuesses, `SOLVE:${submittedPhrase}`],
 					status: res.status as GameStatus,
 					score: res.score,
 					solution: res.solution
@@ -1171,7 +1266,11 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 										<p className="text-xs font-bold text-stone-500">
 											{data.wordState.status === 'won' ? '¡Adivinada!' : 'La palabra era:'}
 										</p>
-										<p className="text-2xl font-black tracking-widest text-emerald-600">
+										<p
+											className={`text-2xl font-black tracking-widest ${
+												data.wordState.status === 'won' ? 'text-emerald-600' : 'text-rose-600'
+											}`}
+										>
 											{data.wordState.solution}
 										</p>
 										<p className="text-xs font-semibold text-stone-500">
@@ -1233,6 +1332,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 									maskedChars={data.phraseState.maskedChars}
 									wrongLetters={data.phraseState.wrongLetters}
 									hint={data.phraseState.hint}
+									status={data.phraseState.status}
 								/>
 
 								{data.phraseState.status === 'playing' && (
@@ -1255,7 +1355,11 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 										<p className="text-xs font-bold text-stone-500">
 											{data.phraseState.status === 'won' ? '¡Frase completada!' : 'La frase era:'}
 										</p>
-										<p className="text-base font-black tracking-wide text-emerald-600">
+										<p
+											className={`text-base font-black tracking-wide ${
+												data.phraseState.status === 'won' ? 'text-emerald-600' : 'text-rose-600'
+											}`}
+										>
 											{data.phraseState.solution}
 										</p>
 										<p className="text-xs font-semibold text-stone-500">
