@@ -29,6 +29,7 @@ import {
 	Award,
 	CheckCircle2,
 	Copy,
+	Crown,
 	Flame,
 	KeyRound,
 	Lock,
@@ -49,7 +50,10 @@ type GameStatus = 'playing' | 'won' | 'lost';
 export function GameShell({ initialData }: { initialData: InitialData }) {
 	const [data, setData] = useState<InitialData>(initialData);
 	const [activeTab, setActiveTab] = useState<'word' | 'phrase' | 'ranking'>('word');
-	const [rankingPeriod, setRankingPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+	const [rankingPeriod, setRankingPeriod] = useState<
+		'daily' | 'weekly' | 'allTime' | 'streaks'
+	>('daily');
+	const [streakMode, setStreakMode] = useState<'active' | 'best'>('active');
 	const [currentGuess, setCurrentGuess] = useState('');
 	const [submitting, setSubmitting] = useState(false);
 	const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -104,18 +108,15 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 	}, []);
 
 	// Refrescar ranking solo al entrar a la pestaña Ranking
-	const handleTabChange = useCallback(
-		(nextTab: string) => {
-			const tab = nextTab as 'word' | 'phrase' | 'ranking';
-			setActiveTab(tab);
-			if (tab === 'ranking') {
-				getLeaderboardsOnly().then((leaderboards) => {
-					setData((prev) => ({ ...prev, leaderboards }));
-				});
-			}
-		},
-		[]
-	);
+	const handleTabChange = useCallback((nextTab: string) => {
+		const tab = nextTab as 'word' | 'phrase' | 'ranking';
+		setActiveTab(tab);
+		if (tab === 'ranking') {
+			getLeaderboardsOnly().then((leaderboards) => {
+				setData((prev) => ({ ...prev, leaderboards }));
+			});
+		}
+	}, []);
 
 	// Si juega como invitado, restaurar progreso diario desde localStorage
 	useEffect(() => {
@@ -691,6 +692,16 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 	}
 
 	const currentUserStreak = data.user?.currentStreak ?? 0;
+
+	const previousTitleMap: Record<'daily' | 'weekly', string> = {
+		daily: 'Podio de Ayer',
+		weekly: 'Podio Semana Pasada'
+	};
+
+	const currentTitleMap: Record<'daily' | 'weekly', string> = {
+		daily: 'Tabla de Hoy',
+		weekly: 'Tabla de Esta Semana'
+	};
 
 	return (
 		<div className="h-dvh w-full overflow-hidden bg-retro-board text-[#292524] flex flex-col">
@@ -1427,7 +1438,7 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 					)}
 				</TabsContent>
 
-				{/* TAB 3: RANKING DEL SQUAD (DIARIO / SEMANAL / MENSUAL) */}
+				{/* TAB 3: RANKING DEL SQUAD (HOY / SEMANA / HISTÓRICO / RACHAS) */}
 				<TabsContent value="ranking" className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 py-3 space-y-3">
 					{!data.user && (
 						<div className="bg-[#fffdf9] border-2 border-b-4 border-[#e6d8c3] rounded-2xl p-4 text-center space-y-2.5 shadow-xs">
@@ -1447,20 +1458,21 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 						</div>
 					)}
 
-					{/* Selector Hoy / Semana / Mes */}
-					<div className="grid grid-cols-3 bg-[#f7eedb] border-2 border-[#e6d8c3] p-1 rounded-xl text-xs font-extrabold">
+					{/* Selector Hoy / Semana / Histórico / Rachas */}
+					<div className="grid grid-cols-4 bg-[#f7eedb] border-2 border-[#e6d8c3] p-1 rounded-xl text-[11px] sm:text-xs font-extrabold">
 						{(
 							[
 								{ id: 'daily', label: 'Hoy' },
-								{ id: 'weekly', label: 'Esta Semana' },
-								{ id: 'monthly', label: 'Este Mes' }
+								{ id: 'weekly', label: 'Semana' },
+								{ id: 'allTime', label: 'Histórico' },
+								{ id: 'streaks', label: 'Rachas' }
 							] as const
 						).map((tab) => (
 							<button
 								key={tab.id}
 								type="button"
 								onClick={() => setRankingPeriod(tab.id)}
-								className={`py-1.5 rounded-lg transition-all cursor-pointer ${
+								className={`py-1.5 rounded-lg transition-all cursor-pointer truncate px-1 ${
 									rankingPeriod === tab.id
 										? 'bg-amber-400 text-amber-950 shadow-xs'
 										: 'text-stone-600 hover:text-stone-900'
@@ -1471,60 +1483,361 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 						))}
 					</div>
 
-					{(() => {
-						const activeBoard = data.leaderboards[rankingPeriod];
-						if (activeBoard.length === 0) {
-							return (
-								<p className="text-center text-xs text-stone-500 py-8">
-									Aún no hay jugadores registrados en el ranking.
-								</p>
-							);
-						}
+					{rankingPeriod === 'streaks' ? (
+						(() => {
+							const activeList =
+								data.leaderboards?.streaks?.active ??
+								[...(data.leaderboards?.allTime ?? [])]
+									.filter((u) => u.currentStreak > 0)
+									.sort((a, b) => b.currentStreak - a.currentStreak || b.maxStreak - a.maxStreak);
 
-						return activeBoard.map((player, index) => {
-							const isMe = data.user?.id === player.id;
+							const bestList =
+								data.leaderboards?.streaks?.best ??
+								[...(data.leaderboards?.allTime ?? [])]
+									.filter((u) => u.maxStreak > 0)
+									.sort((a, b) => b.maxStreak - a.maxStreak || b.currentStreak - a.currentStreak);
+
 							return (
-								<div
-									key={player.id}
-									className={`flex items-center justify-between p-3.5 rounded-2xl border-2 border-b-4 transition-colors ${
-										isMe
-											? 'bg-emerald-50/90 border-emerald-500 shadow-xs'
-											: 'bg-[#fffdf9] border-[#e6d8c3]'
-									}`}
-								>
-									<div className="flex items-center gap-3 shrink-0">
-										<span
-											className={`w-7 h-7 rounded-full text-xs font-black flex items-center justify-center border ${
-												index === 0
-													? 'bg-amber-400 border-amber-600 text-amber-950'
-													: index === 1
-														? 'bg-stone-200 border-stone-400 text-stone-800'
-														: index === 2
-															? 'bg-orange-300 border-orange-500 text-orange-950'
-															: 'bg-[#f7eedb] border-[#e6d8c3] text-stone-600'
+								<div className="space-y-3">
+									{/* Podio Top 3 Mejor Racha Histórica */}
+									<div className="bg-[#fffdf9] border-2 border-b-4 border-[#e6d8c3] rounded-2xl p-3 space-y-2.5 shadow-xs">
+										<div className="flex items-center justify-between">
+											<span className="inline-flex items-center gap-1.5 text-xs font-black text-[#292524]">
+												<Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500" />
+												Récord de Rachas Históricas
+											</span>
+											<span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+												Top 3
+											</span>
+										</div>
+
+										{bestList.length === 0 ? (
+											<p className="text-center text-[11px] text-stone-400 py-2">
+												Aún no hay rachas registradas en el Squad.
+											</p>
+										) : (
+											<div className="grid grid-cols-3 gap-1.5">
+												{bestList.slice(0, 3).map((player, idx) => {
+													const isMe = data.user?.id === player.id;
+													const badgeStyle =
+														idx === 0
+															? 'bg-amber-400 border-amber-600 text-amber-950'
+															: idx === 1
+																? 'bg-stone-200 border-stone-400 text-stone-800'
+																: 'bg-orange-300 border-orange-500 text-orange-950';
+
+													return (
+														<div
+															key={player.id}
+															className={`rounded-xl border p-2 text-center flex flex-col items-center justify-between gap-1 min-w-0 ${
+																isMe
+																	? 'bg-orange-50/90 border-orange-400'
+																	: 'bg-[#fdf8ee] border-[#e6d8c3]'
+															}`}
+														>
+															<span
+																className={`w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center border ${badgeStyle}`}
+															>
+																{idx + 1}
+															</span>
+															<p className="text-xs font-extrabold text-[#292524] truncate w-full">
+																{player.name}
+															</p>
+															<p className="text-[11px] font-black text-orange-600 inline-flex items-center gap-0.5">
+																<Flame className="w-3 h-3 fill-orange-500" />
+																{player.maxStreak} {player.maxStreak === 1 ? 'día' : 'días'}
+															</p>
+														</div>
+													);
+												})}
+											</div>
+										)}
+									</div>
+
+									{/* Conmutador Racha Activa vs Mejor Racha */}
+									<div className="grid grid-cols-2 bg-[#f7eedb] border border-[#e6d8c3] p-1 rounded-xl text-[11px] font-extrabold">
+										<button
+											type="button"
+											onClick={() => setStreakMode('active')}
+											className={`py-1 rounded-lg transition-all cursor-pointer ${
+												streakMode === 'active'
+													? 'bg-[#fffdf9] text-[#292524] shadow-xs'
+													: 'text-stone-500 hover:text-stone-800'
 											}`}
 										>
-											{index + 1}
-										</span>
-										<div>
-											<p className="text-sm font-extrabold text-[#292524]">
-												{player.name}{' '}
-												{isMe && <span className="text-xs text-emerald-600">(Tú)</span>}
-											</p>
-											<p className="text-xs text-stone-500 font-medium">
-												{player.gamesWon}{' '}
-												{player.gamesWon === 1 ? 'ganada' : 'ganadas'} · Racha:{' '}
-												{player.currentStreak}
-											</p>
-										</div>
+											🔥 Rachas Activas
+										</button>
+										<button
+											type="button"
+											onClick={() => setStreakMode('best')}
+											className={`py-1 rounded-lg transition-all cursor-pointer ${
+												streakMode === 'best'
+													? 'bg-[#fffdf9] text-[#292524] shadow-xs'
+													: 'text-stone-500 hover:text-stone-800'
+											}`}
+										>
+											🏆 Mejor Racha
+										</button>
 									</div>
-									<div className="text-right">
-										<p className="text-sm font-black text-emerald-600">{player.totalPoints} pts</p>
-									</div>
+
+									{/* Lista de jugadores ordenados por racha */}
+									{(() => {
+										const list = streakMode === 'active' ? activeList : bestList;
+
+										if (list.length === 0) {
+											return (
+												<p className="text-center text-xs text-stone-500 py-8">
+													{streakMode === 'active'
+														? 'Nadie tiene una racha activa hoy. ¡Gana hoy para iniciar la tuya!'
+														: 'Aún no hay récords de rachas registrados.'}
+												</p>
+											);
+										}
+
+										return list.map((player, index) => {
+											const isMe = data.user?.id === player.id;
+											const streakValue =
+												streakMode === 'active' ? player.currentStreak : player.maxStreak;
+
+											return (
+												<div
+													key={player.id}
+													className={`flex items-center justify-between p-3.5 rounded-2xl border-2 border-b-4 transition-colors ${
+														isMe
+															? 'bg-orange-50/80 border-orange-400 shadow-xs'
+															: 'bg-[#fffdf9] border-[#e6d8c3]'
+													}`}
+												>
+													<div className="flex items-center gap-3 shrink-0">
+														<span
+															className={`w-7 h-7 rounded-full text-xs font-black flex items-center justify-center border ${
+																index === 0
+																	? 'bg-amber-400 border-amber-600 text-amber-950'
+																	: index === 1
+																		? 'bg-stone-200 border-stone-400 text-stone-800'
+																		: index === 2
+																			? 'bg-orange-300 border-orange-500 text-orange-950'
+																			: 'bg-[#f7eedb] border-[#e6d8c3] text-stone-600'
+															}`}
+														>
+															{index + 1}
+														</span>
+														<div>
+															<p className="text-sm font-extrabold text-[#292524]">
+																{player.name}{' '}
+																{isMe && <span className="text-xs text-orange-600">(Tú)</span>}
+															</p>
+															<p className="text-xs text-stone-500 font-medium">
+																Récord personal: {player.maxStreak}{' '}
+																{player.maxStreak === 1 ? 'día' : 'días'}
+															</p>
+														</div>
+													</div>
+
+													<div className="inline-flex items-center gap-1 bg-orange-100 border border-orange-200 text-orange-700 px-2.5 py-1 rounded-full">
+														<Flame className="w-4 h-4 fill-orange-500 text-orange-600" />
+														<span className="text-sm font-black">{streakValue}</span>
+													</div>
+												</div>
+											);
+										});
+									})()}
 								</div>
 							);
-						});
-					})()}
+						})()
+					) : (
+						<>
+							{/* Bloque superior: Récords en Histórico, o Podio Top 3 anterior + Récord en Hoy/Semana */}
+							{rankingPeriod === 'allTime' ? (
+								<div className="bg-[#fffdf9] border-2 border-b-4 border-[#e6d8c3] rounded-2xl p-3 space-y-2.5 shadow-xs">
+									<div className="flex items-center justify-between">
+										<span className="inline-flex items-center gap-1.5 text-xs font-black text-[#292524]">
+											<Crown className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
+											Récords Históricos del Squad
+										</span>
+										<span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+											All-Time
+										</span>
+									</div>
+
+									<div className="grid grid-cols-2 gap-2">
+										{(
+											[
+												{ label: 'Mejor Día', rec: data.leaderboards?.records?.daily ?? null },
+												{ label: 'Mejor Semana', rec: data.leaderboards?.records?.weekly ?? null }
+											] as const
+										).map((entry) => (
+											<div
+												key={entry.label}
+												className="rounded-xl border bg-[#fdf8ee] border-[#e6d8c3] p-2.5 text-center flex flex-col items-center justify-between gap-1 min-w-0"
+											>
+												<span className="text-[10px] font-extrabold uppercase tracking-tight text-stone-500">
+													{entry.label}
+												</span>
+												{entry.rec ? (
+													<>
+														<p className="text-xs font-extrabold text-[#292524] truncate w-full">
+															{entry.rec.name}
+														</p>
+														<p className="text-[11px] font-black text-emerald-600">
+															{entry.rec.totalPoints} pts
+														</p>
+													</>
+												) : (
+													<p className="text-[11px] text-stone-400 py-1">—</p>
+												)}
+											</div>
+										))}
+									</div>
+								</div>
+							) : (
+								(() => {
+									const prevTop3 = data.leaderboards?.previous?.[rankingPeriod] ?? [];
+									const periodRecord = data.leaderboards?.records?.[rankingPeriod] ?? null;
+									const recordLabelMap = {
+										daily: 'Récord en 1 día',
+										weekly: 'Récord en 1 semana'
+									};
+
+									return (
+										<div className="bg-[#fffdf9] border-2 border-b-4 border-[#e6d8c3] rounded-2xl p-3 space-y-2.5 shadow-xs">
+											<div className="flex items-center justify-between">
+												<span className="inline-flex items-center gap-1.5 text-xs font-black text-[#292524]">
+													<Crown className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
+													{previousTitleMap[rankingPeriod]}
+												</span>
+												<span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+													Top 3
+												</span>
+											</div>
+
+											{prevTop3.length === 0 ? (
+												<p className="text-center text-[11px] text-stone-400 py-1.5">
+													Sin registros en ese periodo anterior.
+												</p>
+											) : (
+												<div className="grid grid-cols-3 gap-1.5">
+													{prevTop3.map((player, idx) => {
+														const isMe = data.user?.id === player.id;
+														const badgeStyle =
+															idx === 0
+																? 'bg-amber-400 border-amber-600 text-amber-950'
+																: idx === 1
+																	? 'bg-stone-200 border-stone-400 text-stone-800'
+																	: 'bg-orange-300 border-orange-500 text-orange-950';
+
+														return (
+															<div
+																key={player.id}
+																className={`rounded-xl border p-2 text-center flex flex-col items-center justify-between gap-1 min-w-0 ${
+																	isMe
+																		? 'bg-emerald-50/90 border-emerald-400'
+																		: 'bg-[#fdf8ee] border-[#e6d8c3]'
+																}`}
+															>
+																<span
+																	className={`w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center border ${badgeStyle}`}
+																>
+																	{idx + 1}
+																</span>
+																<p className="text-xs font-extrabold text-[#292524] truncate w-full">
+																	{player.name}
+																</p>
+																<p className="text-[11px] font-black text-emerald-600">
+																	{player.totalPoints} pts
+																</p>
+															</div>
+														);
+													})}
+												</div>
+											)}
+
+											{periodRecord && (
+												<div className="flex items-center justify-between gap-2 pt-2 border-t border-[#e6d8c3] text-[11px]">
+													<span className="inline-flex items-center gap-1 font-bold text-stone-500">
+														<Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400 shrink-0" />
+														{recordLabelMap[rankingPeriod]}:
+													</span>
+													<span className="font-black text-[#292524] truncate">
+														{periodRecord.name}{' '}
+														<span className="text-emerald-600">
+															({periodRecord.totalPoints} pts)
+														</span>
+													</span>
+												</div>
+											)}
+										</div>
+									);
+								})()
+							)}
+
+							{/* Tabla del periodo actual o Histórico Acumulado */}
+							<div className="space-y-2">
+								<p className="text-[11px] font-extrabold uppercase tracking-wider text-stone-500 px-1">
+									{rankingPeriod === 'allTime'
+										? 'Clasificación Histórica Total'
+										: currentTitleMap[rankingPeriod]}
+								</p>
+
+								{(() => {
+									const activeBoard = data.leaderboards?.[rankingPeriod] ?? [];
+									if (activeBoard.length === 0) {
+										return (
+											<p className="text-center text-xs text-stone-500 py-8">
+												Aún no hay jugadores registrados en el ranking.
+											</p>
+										);
+									}
+
+									return activeBoard.map((player, index) => {
+										const isMe = data.user?.id === player.id;
+										return (
+											<div
+												key={player.id}
+												className={`flex items-center justify-between p-3.5 rounded-2xl border-2 border-b-4 transition-colors ${
+													isMe
+														? 'bg-emerald-50/90 border-emerald-500 shadow-xs'
+														: 'bg-[#fffdf9] border-[#e6d8c3]'
+												}`}
+											>
+												<div className="flex items-center gap-3 shrink-0">
+													<span
+														className={`w-7 h-7 rounded-full text-xs font-black flex items-center justify-center border ${
+															index === 0
+																? 'bg-amber-400 border-amber-600 text-amber-950'
+																: index === 1
+																	? 'bg-stone-200 border-stone-400 text-stone-800'
+																	: index === 2
+																		? 'bg-orange-300 border-orange-500 text-orange-950'
+																		: 'bg-[#f7eedb] border-[#e6d8c3] text-stone-600'
+														}`}
+													>
+														{index + 1}
+													</span>
+													<div>
+														<p className="text-sm font-extrabold text-[#292524]">
+															{player.name}{' '}
+															{isMe && <span className="text-xs text-emerald-600">(Tú)</span>}
+														</p>
+														<p className="text-xs text-stone-500 font-medium">
+															{player.gamesWon}{' '}
+															{player.gamesWon === 1 ? 'ganada' : 'ganadas'} · Racha:{' '}
+															{player.currentStreak}
+														</p>
+													</div>
+												</div>
+												<div className="text-right">
+													<p className="text-sm font-black text-emerald-600">
+														{player.totalPoints} pts
+													</p>
+												</div>
+											</div>
+										);
+									});
+								})()}
+							</div>
+						</>
+					)}
 				</TabsContent>
 			</Tabs>
 		</div>

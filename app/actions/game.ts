@@ -151,22 +151,40 @@ async function fetchAllLeaderboards(today: string) {
 	const todayUtc = new Date(Date.UTC(y, m - 1, d));
 	const dayOfWeek = todayUtc.getUTCDay();
 	const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+	// Semana actual
 	const mondayUtc = new Date(Date.UTC(y, m - 1, d - diffToMonday));
-
 	const weekStartStr = mondayUtc.toISOString().slice(0, 10);
-	const monthStartStr = `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-01`;
 
-	async function buildLeaderboard(minDateStr: string) {
+	// Periodos anteriores cerrados (Ayer y Semana pasada)
+	const yesterdayStr = getPreviousDateStr(today);
+	const prevWeekStartUtc = new Date(Date.UTC(y, m - 1, d - diffToMonday - 7));
+	const prevWeekEndUtc = new Date(Date.UTC(y, m - 1, d - diffToMonday - 1));
+	const prevWeekStartStr = prevWeekStartUtc.toISOString().slice(0, 10);
+	const prevWeekEndStr = prevWeekEndUtc.toISOString().slice(0, 10);
+
+	async function buildLeaderboard(
+		minDateStr?: string,
+		maxDateStr?: string,
+		onlyWithPoints = false
+	) {
+		const dateCondition =
+			minDateStr && maxDateStr
+				? sql`${dailyWords.dateStr} >= ${minDateStr} and ${dailyWords.dateStr} <= ${maxDateStr}`
+				: minDateStr
+					? sql`${dailyWords.dateStr} >= ${minDateStr}`
+					: sql`1 = 1`;
+
 		const ptsExpr =
-			sql<number>`coalesce(sum(case when ${dailyWords.dateStr} >= ${minDateStr} then ${gameAttempts.score} else 0 end), 0)`.mapWith(
+			sql<number>`coalesce(sum(case when ${dateCondition} then ${gameAttempts.score} else 0 end), 0)`.mapWith(
 				Number
 			);
 		const wonExpr =
-			sql<number>`count(case when ${dailyWords.dateStr} >= ${minDateStr} and ${gameAttempts.status} = 'won' then 1 end)`.mapWith(
+			sql<number>`count(case when ${dateCondition} and ${gameAttempts.status} = 'won' then 1 end)`.mapWith(
 				Number
 			);
 		const secExpr =
-			sql<number>`coalesce(sum(case when ${dailyWords.dateStr} >= ${minDateStr} then extract(epoch from (${gameAttempts.finishedAt} - ${gameAttempts.startedAt})) else 0 end), 999999)`.mapWith(
+			sql<number>`coalesce(sum(case when ${dateCondition} then extract(epoch from (${gameAttempts.finishedAt} - ${gameAttempts.startedAt})) else 0 end), 999999)`.mapWith(
 				Number
 			);
 
@@ -186,19 +204,87 @@ async function fetchAllLeaderboards(today: string) {
 			.groupBy(user.id)
 			.orderBy(desc(ptsExpr), desc(wonExpr), asc(secExpr));
 
-		return rows.map((row) => ({
+		const mapped = rows.map((row) => ({
 			...row,
 			name: sanitizeDisplayName(row.name)
 		}));
+
+		return onlyWithPoints ? mapped.filter((r) => r.totalPoints > 0).slice(0, 3) : mapped;
 	}
 
-	const [daily, weekly, monthly] = await Promise.all([
+	async function getPeriodRecord(bucketType: 'day' | 'week') {
+		const bucketExpr =
+			bucketType === 'day'
+				? sql`${dailyWords.dateStr}`
+				: sql`to_char(date_trunc('week', ${dailyWords.dateStr}::date), 'YYYY-MM-DD')`;
+
+		const ptsSum = sql<number>`coalesce(sum(${gameAttempts.score}), 0)`.mapWith(Number);
+
+		const [best] = await db
+			.select({
+				id: user.id,
+				name: user.name,
+				periodLabel: bucketExpr.mapWith(String),
+				totalPoints: ptsSum
+			})
+			.from(gameAttempts)
+			.innerJoin(user, eq(gameAttempts.userId, user.id))
+			.innerJoin(dailyWords, eq(gameAttempts.wordId, dailyWords.id))
+			.where(sql`${gameAttempts.score} > 0`)
+			.groupBy(user.id, user.name, bucketExpr)
+			.orderBy(desc(ptsSum), asc(bucketExpr))
+			.limit(1);
+
+		return best
+			? {
+					id: best.id,
+					name: sanitizeDisplayName(best.name),
+					periodLabel: best.periodLabel,
+					totalPoints: best.totalPoints
+				}
+			: null;
+	}
+
+	// Lote 1: Hoy, Semana e Histórico total
+	const [daily, weekly, allTime] = await Promise.all([
 		buildLeaderboard(today),
 		buildLeaderboard(weekStartStr),
-		buildLeaderboard(monthStartStr)
+		buildLeaderboard()
 	]);
 
-	return { daily, weekly, monthly };
+	// Lote 2: Podios anteriores (Ayer y Semana pasada) y récords históricos (Día y Semana)
+	const [previousDaily, previousWeekly, bestDayRecord, bestWeekRecord] = await Promise.all([
+		buildLeaderboard(yesterdayStr, yesterdayStr, true),
+		buildLeaderboard(prevWeekStartStr, prevWeekEndStr, true),
+		getPeriodRecord('day'),
+		getPeriodRecord('week')
+	]);
+
+	const activeStreaks = [...allTime]
+		.filter((u) => u.currentStreak > 0)
+		.sort((a, b) => b.currentStreak - a.currentStreak || b.maxStreak - a.maxStreak);
+
+	const bestStreaks = [...allTime]
+		.filter((u) => u.maxStreak > 0)
+		.sort((a, b) => b.maxStreak - a.maxStreak || b.currentStreak - a.currentStreak);
+
+	return {
+		daily,
+		weekly,
+		allTime,
+		streaks: {
+			active: activeStreaks,
+			best: bestStreaks
+		},
+		previous: {
+			daily: previousDaily,
+			weekly: previousWeekly
+		},
+		records: {
+			daily: bestDayRecord,
+			weekly: bestWeekRecord
+		}
+	};
 }
 
 export async function getLeaderboardsOnly() {
@@ -210,7 +296,6 @@ export async function getInitialGameData() {
 	await connection();
 	const today = getLocalTodayStr();
 
-	// Sesión y retos del día en paralelo
 	const [session, todaysChallenges] = await Promise.all([
 		auth.api.getSession({ headers: await headers() }),
 		db.select().from(dailyWords).where(eq(dailyWords.dateStr, today))
@@ -219,7 +304,6 @@ export async function getInitialGameData() {
 	let wordDaily = todaysChallenges.find((c) => c.mode === 'word') ?? null;
 	let phraseDaily = todaysChallenges.find((c) => c.mode === 'phrase') ?? null;
 
-	// Respaldo automático en paralelo si falta alguno
 	if (!wordDaily || !phraseDaily) {
 		const fallback = getAutoGeneratedChallenges(today);
 		const [insertedWord, insertedPhrase] = await Promise.all([
@@ -252,12 +336,10 @@ export async function getInitialGameData() {
 		phraseDaily = insertedPhrase;
 	}
 
-	// Consultas de usuario y rankings en paralelo (sin escritura innecesaria en cada carga)
-	const [userAttempts, leaderboards, currentUserRow, allTimeStats] = await Promise.all([
+	const [userAttempts, currentUserRow, allTimeStats] = await Promise.all([
 		session
 			? db.select().from(gameAttempts).where(eq(gameAttempts.userId, session.user.id))
 			: Promise.resolve([]),
-		fetchAllLeaderboards(today),
 		session
 			? db
 					.select({
@@ -286,6 +368,8 @@ export async function getInitialGameData() {
 					.then((r) => r[0] ?? null)
 			: Promise.resolve(null)
 	]);
+
+	const leaderboards = await fetchAllLeaderboards(today);
 
 	// Estado Modo Palabra
 	let wordState = null;
@@ -678,7 +762,6 @@ export async function syncGuestProgress(payload: {
 	const phraseDaily = todaysChallenges.find((c) => c.mode === 'phrase');
 	let syncedAny = false;
 
-	// Verificar intentos existentes en paralelo
 	const [existingWord, existingPhrase] = await Promise.all([
 		wordDaily && payload.wordGuesses?.length
 			? db
