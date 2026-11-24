@@ -1,4 +1,5 @@
 import spanishWords from 'an-array-of-spanish-words';
+import { CRIOLLO_WORDS, FOOTBALL_TEAMS, VENEZUELA_PLACES } from './custom-words';
 
 export function normalizeSpanish(text: string): string {
 	return text
@@ -12,9 +13,34 @@ export function normalizeSpanish(text: string): string {
 		.replace(/Ü/g, 'U');
 }
 
-const VALID_WORDS_SET = new Set(
-	(spanishWords as string[]).map((w) => normalizeSpanish(w))
-);
+const FALLBACK_WORDS: Array<{ word: string; hint: string }> = [
+	{ word: 'AREPA', hint: 'Comida tradicional' },
+	{ word: 'CACHAPA', hint: 'Comida tradicional' },
+	{ word: 'HALLACA', hint: 'Comida tradicional' },
+	{ word: 'TEQUENO', hint: 'Comida tradicional' },
+	{ word: 'PAPELON', hint: 'Comida tradicional' },
+	{ word: 'TURPIAL', hint: 'Animal' },
+	{ word: 'CHIGUIRE', hint: 'Animal' },
+	{ word: 'MORROCOY', hint: 'Animal' },
+	{ word: 'GUACAMAYA', hint: 'Animal' },
+	{ word: 'ARAGUANEY', hint: 'Planta' },
+	{ word: 'CUATRO', hint: 'Tema musical' },
+	{ word: 'JOROPO', hint: 'Tema musical' },
+	{ word: 'CUBIRO', hint: 'Lugar' },
+	{ word: 'MERIDA', hint: 'Lugar' },
+	{ word: 'GUARO', hint: 'Gentilicio regional' },
+	{ word: 'CHINCHORRO', hint: 'Objeto tradicional' },
+	{ word: 'PAPAGAYO', hint: 'Juego tradicional' },
+	{ word: 'TAMUNANGUE', hint: 'Baile tradicional' }
+];
+
+const VALID_WORDS_SET = new Set<string>([
+	...(spanishWords as string[]).map((w) => normalizeSpanish(w)),
+	...VENEZUELA_PLACES.map((w) => normalizeSpanish(w)),
+	...FOOTBALL_TEAMS.map((w) => normalizeSpanish(w)),
+	...CRIOLLO_WORDS.map((w) => normalizeSpanish(w)),
+	...FALLBACK_WORDS.map((item) => normalizeSpanish(item.word))
+]);
 
 export function isValidSpanishWord(word: string, expectedLength: number): boolean {
 	const clean = normalizeSpanish(word);
@@ -31,29 +57,15 @@ export function getLocalTodayStr(): string {
 	}).format(new Date());
 }
 
-const FALLBACK_WORDS: Array<{ word: string; hint: string }> = [
-	{ word: 'AREPA', hint: 'Comida tradicional' },
-	{ word: 'CACHAPA', hint: 'Comida tradicional' },
-	{ word: 'HALLACA', hint: 'Comida tradicional' },
-	{ word: 'TEQUENO', hint: 'Comida tradicional' },
-	{ word: 'PAPELON', hint: 'Comida tradicional' },
-	{ word: 'TURPIAL', hint: 'Animal' },
-	{ word: 'CHIGUIRE', hint: 'Animal' },
-	{ word: 'MORROCOY', hint: 'Animal' },
-	{ word: 'GUACAMAYA', hint: 'Animal' },
-	{ word: 'ARAGUANEY', hint: 'Planta' },
-	{ word: 'CUATRO', hint: 'Tema músical' },
-	{ word: 'JOROPO', hint: 'Tema músical' },
-	{ word: 'CUBIRO', hint: 'Lugar' },
-	{ word: 'MERIDA', hint: 'Lugar' },
-];
-
 const FALLBACK_PHRASES: Array<{ word: string; hint: string }> = [
 	{ word: 'CAMARON QUE SE DUERME SE LO LLEVA LA CORRIENTE', hint: 'Refrán popular' },
 	{ word: 'AL QUE MADRUGA DIOS LO AYUDA', hint: 'Dicho popular' },
 	{ word: 'QUIEN MUCHO ABARCA POCO APRIETA', hint: 'Refrán popular' },
 	{ word: 'EN BOCA CERRADA NO ENTRAN MOSCAS', hint: 'Consejo clásico' },
 	{ word: 'NO POR MUCHO MADRUGAR AMANECE MAS TEMPRANO', hint: 'Refrán popular' },
+	{ word: 'MORROCOY NO SUBE PALO NI QUE LE PONGAN HORQUETA', hint: 'Dicho criollo' },
+	{ word: 'CACHICAMO TRABAJANDO PA LAPA', hint: 'Expresión popular' },
+	{ word: 'MAS SABE EL DIABLO POR VIEJO QUE POR DIABLO', hint: 'Refrán popular' }
 ];
 
 function hashDateSeed(dateStr: string): number {
