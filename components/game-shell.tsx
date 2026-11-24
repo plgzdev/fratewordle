@@ -35,7 +35,6 @@ import {
 	Mail,
 	MessageCircle,
 	Pencil,
-	Share2,
 	Star,
 	Trophy,
 	User,
@@ -400,13 +399,9 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 		setTimeout(() => setCopied(false), 2000);
 	}
 
-	function handleWhatsAppShare(mode: 'word' | 'phrase', target: 'group' | 'status') {
+	function handleWhatsAppShare(mode: 'word' | 'phrase') {
 		const text = getShareText(mode);
 		if (!text) return;
-
-		if (target === 'status') {
-			showToast('Selecciona "Mi estado" en WhatsApp');
-		}
 
 		const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
 		window.open(waUrl, '_blank', 'noopener,noreferrer');
@@ -1193,35 +1188,24 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 										</button>
 									)}
 
-									<div className="space-y-2 pt-1">
+									<div className="grid grid-cols-2 gap-2 pt-1">
 										<button
 											type="button"
-											onClick={() => handleWhatsAppShare('word', 'group')}
-											className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-emerald-700 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+											onClick={() => handleWhatsAppShare('word')}
+											className="py-2.5 px-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-emerald-700 text-white font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
 										>
 											<MessageCircle className="w-4 h-4 shrink-0" />
-											Compartir en grupo WhatsApp
+											<span>Compartir por WhatsApp</span>
 										</button>
 
-										<div className="grid grid-cols-2 gap-2">
-											<button
-												type="button"
-												onClick={() => handleWhatsAppShare('word', 'status')}
-												className="py-2.5 px-2 rounded-xl bg-amber-400 hover:bg-amber-300 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-amber-600 text-amber-950 font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-											>
-												<Share2 className="w-3.5 h-3.5 shrink-0" />
-												<span>Estado WhatsApp</span>
-											</button>
-
-											<button
-												type="button"
-												onClick={() => handleCopyShare('word')}
-												className="py-2.5 px-2 rounded-xl bg-[#fffdf9] hover:bg-stone-100 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-stone-300 text-stone-700 font-extrabold text-[11px] sm:text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-											>
-												<Copy className="w-3.5 h-3.5 shrink-0" />
-												<span>{copied ? '¡Copiado!' : 'Copiar en portapapeles'}</span>
-											</button>
-										</div>
+										<button
+											type="button"
+											onClick={() => handleCopyShare('word')}
+											className="py-2.5 px-2 rounded-xl bg-[#fffdf9] hover:bg-stone-100 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-stone-300 text-stone-700 font-extrabold text-[11px] sm:text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+										>
+											<Copy className="w-3.5 h-3.5 shrink-0" />
+											<span>{copied ? '¡Copiado!' : 'Copiar en portapapeles'}</span>
+										</button>
 									</div>
 								</div>
 							) : (
@@ -1288,35 +1272,24 @@ export function GameShell({ initialData }: { initialData: InitialData }) {
 										</button>
 									)}
 
-									<div className="space-y-2 pt-1">
+									<div className="grid grid-cols-2 gap-2 pt-1">
 										<button
 											type="button"
-											onClick={() => handleWhatsAppShare('phrase', 'group')}
-											className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-emerald-700 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+											onClick={() => handleWhatsAppShare('phrase')}
+											className="py-2.5 px-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-emerald-700 text-white font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
 										>
 											<MessageCircle className="w-4 h-4 shrink-0" />
-											Compartir en grupo WhatsApp
+											<span>Compartir por WhatsApp</span>
 										</button>
 
-										<div className="grid grid-cols-2 gap-2">
-											<button
-												type="button"
-												onClick={() => handleWhatsAppShare('phrase', 'status')}
-												className="py-2.5 px-2 rounded-xl bg-amber-400 hover:bg-amber-300 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-amber-600 text-amber-950 font-black text-[11px] sm:text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-											>
-												<Share2 className="w-3.5 h-3.5 shrink-0" />
-												<span>Estado WhatsApp</span>
-											</button>
-
-											<button
-												type="button"
-												onClick={() => handleCopyShare('phrase')}
-												className="py-2.5 px-2 rounded-xl bg-[#fffdf9] hover:bg-stone-100 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-stone-300 text-stone-700 font-extrabold text-[11px] sm:text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-											>
-												<Copy className="w-3.5 h-3.5 shrink-0" />
-												<span>{copied ? '¡Copiado!' : 'Copiar en portapapeles'}</span>
-											</button>
-										</div>
+										<button
+											type="button"
+											onClick={() => handleCopyShare('phrase')}
+											className="py-2.5 px-2 rounded-xl bg-[#fffdf9] hover:bg-stone-100 active:translate-y-0.5 active:border-b-2 border-2 border-b-4 border-stone-300 text-stone-700 font-extrabold text-[11px] sm:text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+										>
+											<Copy className="w-3.5 h-3.5 shrink-0" />
+											<span>{copied ? '¡Copiado!' : 'Copiar en portapapeles'}</span>
+										</button>
 									</div>
 								</div>
 							) : (
