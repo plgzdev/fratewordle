@@ -27,12 +27,20 @@ export function WordBoard({
 	isPlaying,
 	shake
 }: WordBoardProps) {
+	// Escalamos el ancho del tablero proporcionalmente a `length` para que
+	// palabras cortas (3-4 letras) no generen casillas gigantes en vertical
 	const maxWidthClass =
-		length >= 9
-			? 'max-w-[320px] sm:max-w-[440px]'
-			: length >= 7
-				? 'max-w-[300px] sm:max-w-[420px]'
-				: 'max-w-[265px] sm:max-w-[350px]';
+		length <= 3
+			? 'max-w-[165px] sm:max-w-[200px]'
+			: length === 4
+				? 'max-w-[215px] sm:max-w-[260px]'
+				: length === 5
+					? 'max-w-[265px] sm:max-w-[320px]'
+					: length === 6
+						? 'max-w-[300px] sm:max-w-[365px]'
+						: length <= 8
+							? 'max-w-[320px] sm:max-w-[420px]'
+							: 'max-w-[340px] sm:max-w-[450px]';
 
 	const textSizeClass =
 		length >= 9
