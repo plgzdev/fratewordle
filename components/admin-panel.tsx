@@ -6,9 +6,16 @@ import {
 	deleteChallenge,
 	getAdminSchedule,
 	saveBulkSchedule,
-	saveSingleChallenge
+	saveSingleChallenge,
+	updateChallenge
 } from '@/app/actions/admin';
 import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -17,6 +24,7 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Layers,
+	Pencil,
 	Search,
 	Trash2
 } from 'lucide-react';
@@ -46,6 +54,13 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 	const [singleMode, setSingleMode] = useState<'word' | 'phrase'>('word');
 	const [singleWord, setSingleWord] = useState('');
 	const [singleHint, setSingleHint] = useState('');
+
+	// Estado modal de edición
+	const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
+	const [editWord, setEditWord] = useState('');
+	const [editHint, setEditHint] = useState('');
+	const [editError, setEditError] = useState<string | null>(null);
+	const [savingEdit, setSavingEdit] = useState(false);
 
 	async function reload() {
 		const fresh = await getAdminSchedule();
@@ -137,9 +152,49 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 			setSingleHint('');
 			await reload();
 			notify('Guardado correctamente.');
+		} else if ('error' in res && res.error === 'WORD_NO_SPACES') {
+			notify('En modo Palabra no se permiten espacios.');
 		} else {
 			notify('La palabra o frase es muy corta.');
 		}
+	}
+
+	function openEditModal(item: ScheduleItem) {
+		setEditingItem(item);
+		setEditWord(item.word);
+		setEditHint(item.hint ?? '');
+		setEditError(null);
+	}
+
+	async function handleEditSubmit(e: React.FormEvent) {
+		e.preventDefault();
+		if (!editingItem || savingEdit) return;
+
+		setEditError(null);
+		setSavingEdit(true);
+
+		const res = await updateChallenge({
+			id: editingItem.id,
+			word: editWord,
+			hint: editHint
+		});
+
+		setSavingEdit(false);
+
+		if ('error' in res) {
+			if (res.error === 'WORD_NO_SPACES') {
+				setEditError('En modo Palabra no se permiten espacios.');
+			} else if (res.error === 'INVALID_WORD') {
+				setEditError('La palabra o frase es muy corta.');
+			} else {
+				setEditError('No se pudo actualizar el reto.');
+			}
+			return;
+		}
+
+		setEditingItem(null);
+		await reload();
+		notify('Reto actualizado y partidas reiniciadas.');
 	}
 
 	async function handleDelete(id: number) {
@@ -458,7 +513,7 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 												</div>
 											</div>
 
-											{/* Retos del día en 2 columnas en desktop / apilados compactos en móvil */}
+											{/* Retos del día */}
 											<div
 												className={`grid gap-2 ${
 													modeFilter === 'all' ? 'sm:grid-cols-2' : 'grid-cols-1'
@@ -481,14 +536,24 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 																		</p>
 																	)}
 																</div>
-																<button
-																	type="button"
-																	onClick={() => handleDelete(day.word!.id)}
-																	title="Eliminar solo la palabra"
-																	className="p-1 text-zinc-500 hover:text-rose-400 rounded cursor-pointer shrink-0"
-																>
-																	<Trash2 className="w-3.5 h-3.5" />
-																</button>
+																<div className="flex items-center gap-0.5 shrink-0">
+																	<button
+																		type="button"
+																		onClick={() => openEditModal(day.word!)}
+																		title="Editar palabra"
+																		className="p-1 text-zinc-500 hover:text-amber-300 rounded cursor-pointer"
+																	>
+																		<Pencil className="w-3.5 h-3.5" />
+																	</button>
+																	<button
+																		type="button"
+																		onClick={() => handleDelete(day.word!.id)}
+																		title="Eliminar solo la palabra"
+																		className="p-1 text-zinc-500 hover:text-rose-400 rounded cursor-pointer"
+																	>
+																		<Trash2 className="w-3.5 h-3.5" />
+																	</button>
+																</div>
 															</>
 														) : (
 															<span className="text-[11px] text-zinc-500 italic py-1">
@@ -515,14 +580,24 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 																		</p>
 																	)}
 																</div>
-																<button
-																	type="button"
-																	onClick={() => handleDelete(day.phrase!.id)}
-																	title="Eliminar solo la frase"
-																	className="p-1 text-zinc-500 hover:text-rose-400 rounded cursor-pointer shrink-0"
-																>
-																	<Trash2 className="w-3.5 h-3.5" />
-																</button>
+																<div className="flex items-center gap-0.5 shrink-0">
+																	<button
+																		type="button"
+																		onClick={() => openEditModal(day.phrase!)}
+																		title="Editar frase"
+																		className="p-1 text-zinc-500 hover:text-amber-300 rounded cursor-pointer"
+																	>
+																		<Pencil className="w-3.5 h-3.5" />
+																	</button>
+																	<button
+																		type="button"
+																		onClick={() => handleDelete(day.phrase!.id)}
+																		title="Eliminar solo la frase"
+																		className="p-1 text-zinc-500 hover:text-rose-400 rounded cursor-pointer"
+																	>
+																		<Trash2 className="w-3.5 h-3.5" />
+																	</button>
+																</div>
 															</>
 														) : (
 															<span className="text-[11px] text-zinc-500 italic py-1">
@@ -567,6 +642,73 @@ export function AdminPanel({ initialSchedule }: { initialSchedule: ScheduleData 
 					)}
 				</div>
 			</div>
+
+			{/* MODAL DE EDICIÓN */}
+			<Dialog open={Boolean(editingItem)} onOpenChange={(open) => !open && setEditingItem(null)}>
+				<DialogContent className="bg-zinc-900 border border-zinc-800 text-zinc-100 w-[calc(100%-1.5rem)] max-w-sm rounded-2xl">
+					<DialogHeader>
+						<DialogTitle className="text-base font-extrabold text-zinc-100">
+							Editar {editingItem?.mode === 'word' ? 'Palabra' : 'Frase'} ·{' '}
+							<span className="font-mono text-emerald-400">{editingItem?.dateStr}</span>
+						</DialogTitle>
+					</DialogHeader>
+
+					<form onSubmit={handleEditSubmit} className="space-y-3.5 pt-1">
+						<div className="space-y-1">
+							<label className="text-xs font-medium text-zinc-300">
+								{editingItem?.mode === 'word' ? 'Palabra' : 'Frase completa'}
+							</label>
+							<Input
+								required
+								value={editWord}
+								onChange={(e) => setEditWord(e.target.value)}
+								placeholder={
+									editingItem?.mode === 'word' ? 'Ej: TURPIAL' : 'Ej: A CABALLO REGALADO'
+								}
+								className="bg-zinc-950 border-zinc-700 text-zinc-100 uppercase font-bold"
+							/>
+						</div>
+
+						<div className="space-y-1">
+							<label className="text-xs font-medium text-zinc-300">Pista (opcional)</label>
+							<Input
+								value={editHint}
+								onChange={(e) => setEditHint(e.target.value)}
+								placeholder="Ej: Ave nacional"
+								className="bg-zinc-950 border-zinc-700 text-zinc-100"
+							/>
+						</div>
+
+						<p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2 leading-snug">
+							Al guardar, se reiniciarán automáticamente las partidas jugadas en este reto para evitar errores en el tablero.
+						</p>
+
+						{editError && (
+							<p className="text-xs font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2">
+								{editError}
+							</p>
+						)}
+
+						<div className="flex gap-2 pt-1">
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => setEditingItem(null)}
+								className="flex-1 border-zinc-700 bg-zinc-950 text-zinc-300 hover:bg-zinc-800 hover:text-white cursor-pointer"
+							>
+								Cancelar
+							</Button>
+							<Button
+								type="submit"
+								disabled={savingEdit || !editWord.trim()}
+								className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-extrabold cursor-pointer"
+							>
+								{savingEdit ? 'Guardando...' : 'Guardar cambios'}
+							</Button>
+						</div>
+					</form>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

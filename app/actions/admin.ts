@@ -3,9 +3,10 @@
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { db } from '@/db';
-import { dailyWords } from '@/db/schema';
+import { dailyWords, gameAttempts } from '@/db/schema';
 import { and, asc, eq, gte } from 'drizzle-orm';
 import { getLocalTodayStr, normalizeSpanish } from '@/lib/dictionary';
+import { revalidatePath } from 'next/cache';
 
 async function requireAdmin() {
 	const session = await auth.api.getSession({ headers: await headers() });
@@ -43,8 +44,11 @@ export async function saveSingleChallenge(input: {
 	const admin = await requireAdmin();
 	if (!admin) return { error: 'UNAUTHORIZED' as const };
 
-	const cleanedWord = normalizeSpanish(input.word);
+	const cleanedWord = normalizeSpanish(input.word).replace(/\s+/g, ' ').trim();
 	if (cleanedWord.length < 2) return { error: 'INVALID_WORD' as const };
+	if (input.mode === 'word' && /\s/.test(cleanedWord)) {
+		return { error: 'WORD_NO_SPACES' as const };
+	}
 
 	const hint = input.hint?.trim() || null;
 
@@ -67,6 +71,42 @@ export async function saveSingleChallenge(input: {
 		});
 	}
 
+	revalidatePath('/');
+	return { ok: true as const };
+}
+
+export async function updateChallenge(input: {
+	id: number;
+	word: string;
+	hint?: string;
+}) {
+	const admin = await requireAdmin();
+	if (!admin) return { error: 'UNAUTHORIZED' as const };
+
+	const [existing] = await db
+		.select()
+		.from(dailyWords)
+		.where(eq(dailyWords.id, input.id));
+
+	if (!existing) return { error: 'NOT_FOUND' as const };
+
+	const cleanedWord = normalizeSpanish(input.word).replace(/\s+/g, ' ').trim();
+	if (cleanedWord.length < 2) return { error: 'INVALID_WORD' as const };
+	if (existing.mode === 'word' && /\s/.test(cleanedWord)) {
+		return { error: 'WORD_NO_SPACES' as const };
+	}
+
+	const hint = input.hint?.trim() || null;
+
+	await Promise.all([
+		db
+			.update(dailyWords)
+			.set({ word: cleanedWord, hint })
+			.where(eq(dailyWords.id, input.id)),
+		db.delete(gameAttempts).where(eq(gameAttempts.wordId, input.id))
+	]);
+
+	revalidatePath('/');
 	return { ok: true as const };
 }
 
@@ -96,8 +136,9 @@ export async function saveBulkSchedule(input: {
 	for (let i = 0; i < lines.length; i++) {
 		// Formato aceptado por línea: PALABRA O FRASE | pista opcional
 		const [wordPart, hintPart] = lines[i].split('|');
-		const cleanedWord = normalizeSpanish(wordPart ?? '');
+		const cleanedWord = normalizeSpanish(wordPart ?? '').replace(/\s+/g, ' ').trim();
 		if (cleanedWord.length < 2) continue;
+		if (input.mode === 'word' && /\s/.test(cleanedWord)) continue;
 
 		const targetDate = addDaysToDateStr(input.startDate, count);
 		const hint = hintPart?.trim() || null;
@@ -124,6 +165,7 @@ export async function saveBulkSchedule(input: {
 		count++;
 	}
 
+	revalidatePath('/');
 	return { ok: true as const, count };
 }
 
@@ -132,5 +174,6 @@ export async function deleteChallenge(id: number) {
 	if (!admin) return { error: 'UNAUTHORIZED' as const };
 
 	await db.delete(dailyWords).where(eq(dailyWords.id, id));
+	revalidatePath('/');
 	return { ok: true as const };
 }
